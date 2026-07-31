@@ -1,4 +1,4 @@
-# LearnLoop - AI Study Workspace + Learning Passport
+# Notestamp - AI Study Workspace + Learning Passport
 
 LearnLoop is evolving from a hackathon proof-of-concept into a full study workspace.
 Import learning content, generate structured study artifacts, track mastery over time, and earn verifiable credentials from real progress.
