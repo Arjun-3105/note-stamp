@@ -147,3 +147,4 @@ export default function AssessmentResult({ result }: { result: Assessment }) {
     </motion.div>
   );
 }
+

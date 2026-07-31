@@ -492,3 +492,4 @@ export function ReportModal({ open, onClose, result, topic, onMint }: Props) {
     </AnimatePresence>
   );
 }
+

@@ -809,3 +809,4 @@ export function QuizReportModal({ open, onClose, data, mintContext, onRetry }: P
     </AnimatePresence>
   );
 }
+

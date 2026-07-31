@@ -1,107 +1,458 @@
-.main {
+/* ══════════════════════════════════════════════════════════════════════════
+   LearnLoop — Landing Page
+   Design language: Linear / Vercel — dark, precise, typographically led
+   Colour: #0a0f1a base · #52ebcf teal · #59aeff blue · #a78bfa violet
+══════════════════════════════════════════════════════════════════════════ */
+
+/* ── Reset / base ─────────────────────────────────────────────────────── */
+.page {
+  position: relative;
   min-height: 100vh;
+  background: #0a0f1a;
+  color: #e2eaff;
+  font-family: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  -webkit-font-smoothing: antialiased;
+  overflow-x: hidden;
 }
 
+/* ── Background ───────────────────────────────────────────────────────── */
+.bg { position: fixed; inset: 0; pointer-events: none; z-index: 0; overflow: hidden; }
+.bgGlow1 {
+  position: absolute; border-radius: 50%;
+  width: 75vw; height: 75vw; top: -25vw; left: -20vw;
+  background: radial-gradient(circle, rgba(82,235,207,0.055) 0%, transparent 65%);
+}
+.bgGlow2 {
+  position: absolute; border-radius: 50%;
+  width: 65vw; height: 65vw; bottom: -20vw; right: -15vw;
+  background: radial-gradient(circle, rgba(89,174,255,0.05) 0%, transparent 65%);
+}
+.bgGrid {
+  position: absolute; inset: 0;
+  background-image: radial-gradient(rgba(255,255,255,0.025) 1px, transparent 1px);
+  background-size: 32px 32px;
+}
+
+/* ── Nav ──────────────────────────────────────────────────────────────── */
+.nav {
+  position: fixed; top: 0; left: 0; right: 0; z-index: 50;
+  height: 56px;
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 0 clamp(1rem, 4vw, 3.5rem);
+  background: rgba(10, 15, 26, 0.85);
+  backdrop-filter: blur(14px) saturate(150%);
+  -webkit-backdrop-filter: blur(14px) saturate(150%);
+  border-bottom: 1px solid rgba(255,255,255,0.06);
+}
+.navBrand { display: flex; align-items: center; gap: 8px; text-decoration: none; }
+.navLogo {
+  width: 28px; height: 28px;
+  background: linear-gradient(135deg, #52ebcf, #59aeff);
+  border-radius: 7px;
+  display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+}
+.navBrandText { font-size: 0.9rem; font-weight: 800; letter-spacing: -0.04em; color: #e2eaff; }
+
+.navLinks { display: flex; align-items: center; gap: 2px; }
+.navLink {
+  font-size: 0.83rem; font-weight: 500; color: rgba(226,234,255,0.48);
+  padding: 0.38rem 0.8rem; border-radius: 7px; text-decoration: none;
+  transition: color 0.13s, background 0.13s;
+}
+.navLink:hover { color: #e2eaff; background: rgba(255,255,255,0.06); }
+
+.navActions { display: flex; align-items: center; gap: 0.45rem; }
+.navGhost {
+  font-size: 0.83rem; font-weight: 500; color: rgba(226,234,255,0.48);
+  padding: 0.38rem 0.8rem; border-radius: 7px; text-decoration: none;
+  transition: color 0.13s;
+}
+.navGhost:hover { color: #e2eaff; }
+.navCta {
+  font-size: 0.83rem; font-weight: 700; color: #0a0f1a;
+  background: linear-gradient(120deg, #52ebcf, #59aeff);
+  padding: 0.38rem 0.95rem; border-radius: 7px; text-decoration: none;
+  transition: opacity 0.13s; box-shadow: 0 0 14px rgba(82,235,207,0.18);
+}
+.navCta:hover { opacity: 0.86; }
+
+/* ── Shared buttons ───────────────────────────────────────────────────── */
+.btnPrimary {
+  display: inline-flex; align-items: center; gap: 7px;
+  font-size: 0.92rem; font-weight: 700; color: #0a0f1a;
+  background: linear-gradient(120deg, #52ebcf 0%, #59aeff 100%);
+  padding: 0.75rem 1.55rem; border-radius: 10px; text-decoration: none;
+  box-shadow: 0 0 24px rgba(82,235,207,0.2), 0 2px 16px rgba(0,0,0,0.3);
+  transition: opacity 0.13s, transform 0.13s;
+  white-space: nowrap;
+}
+.btnPrimary:hover { opacity: 0.88; transform: translateY(-1px); }
+
+.btnSecondary {
+  display: inline-flex; align-items: center; gap: 7px;
+  font-size: 0.9rem; font-weight: 500; color: rgba(226,234,255,0.58);
+  padding: 0.75rem 1.25rem; border-radius: 10px; text-decoration: none;
+  border: 1px solid rgba(255,255,255,0.1);
+  transition: color 0.13s, border-color 0.13s, background 0.13s;
+  white-space: nowrap;
+}
+.btnSecondary:hover { color: #e2eaff; border-color: rgba(255,255,255,0.2); background: rgba(255,255,255,0.04); }
+
+/* ── Hero ─────────────────────────────────────────────────────────────── */
 .hero {
-  padding: 6rem 2rem;
-  background-color: var(--bg-primary);
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  text-align: center;
-  border-bottom: var(--border-width) solid var(--border-color);
+  position: relative; z-index: 5;
+  display: flex; flex-direction: column; align-items: center; text-align: center;
+  padding: clamp(6rem, 13vw, 9.5rem) clamp(1rem, 4vw, 2rem) clamp(3rem, 6vw, 5rem);
+  max-width: 780px; margin: 0 auto;
 }
 
-.heroContent {
-  max-width: 800px;
+.eyebrow {
+  display: inline-flex; align-items: center; gap: 7px;
+  font-size: 0.66rem; font-weight: 700; letter-spacing: 0.14em;
+  color: rgba(82,235,207,0.9);
+  background: rgba(82,235,207,0.07); border: 1px solid rgba(82,235,207,0.2);
+  padding: 0.32rem 0.85rem; border-radius: 999px; margin-bottom: 1.4rem;
+}
+.eyebrowDot {
+  width: 5px; height: 5px; border-radius: 50%;
+  background: #52ebcf; box-shadow: 0 0 6px rgba(82,235,207,0.9);
+  animation: blink 2s ease-in-out infinite;
+}
+@keyframes blink { 0%,100%{opacity:1} 50%{opacity:0.2} }
+
+.h1 {
+  font-size: clamp(2.6rem, 7vw, 5.2rem);
+  font-weight: 900; line-height: 1.04; letter-spacing: -0.045em;
+  color: #e2eaff; margin: 0 0 1.1rem;
+}
+.h1Accent {
+  background: linear-gradient(108deg, #52ebcf 0%, #59aeff 48%, #a78bfa 100%);
+  background-size: 200%;
+  -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
+  animation: gradAnim 6s linear infinite;
+}
+@keyframes gradAnim { 0%,100%{background-position:0% 50%} 50%{background-position:100% 50%} }
+
+.heroSub {
+  font-size: clamp(0.95rem, 2.2vw, 1.08rem); color: rgba(226,234,255,0.55);
+  line-height: 1.8; margin: 0 0 1.8rem; max-width: 620px;
 }
 
-.title {
-  font-size: 4rem;
-  line-height: 1.1;
-  margin-bottom: 1.5rem;
+.heroCtas {
+  display: flex; gap: 0.7rem; flex-wrap: wrap; justify-content: center;
+  margin-bottom: 1.2rem;
 }
 
-.highlight {
-  color: var(--bg-accent);
-  display: inline-block;
-  background-color: #fff;
-  padding: 0 0.5rem;
-  border: var(--border-width) solid var(--border-color);
-  box-shadow: 6px 6px 0px var(--bg-accent-secondary);
-  transform: rotate(-2deg);
-  margin-top: 0.5rem;
+.trust {
+  display: flex; align-items: center; gap: 8px; margin-bottom: 2.8rem;
+  font-size: 0.75rem; color: rgba(226,234,255,0.35);
 }
+.trustStar { color: #f59e0b; font-size: 0.65rem; letter-spacing: 1px; }
 
-.subtitle {
-  font-size: 1.25rem;
-  color: var(--text-muted);
-  margin-bottom: 3rem;
-  max-width: 600px;
-  margin-left: auto;
-  margin-right: auto;
-}
-
-.inputGroup {
-  display: flex;
-  gap: 1rem;
-  max-width: 600px;
+/* ── Product mockup ───────────────────────────────────────────────────── */
+.mockup {
+  width: 100%;
+  max-width: 860px;
   margin: 0 auto;
+  border-radius: 14px;
+  border: 1px solid rgba(255,255,255,0.1);
+  background: #0d1526;
+  overflow: hidden;
+  box-shadow: 0 0 0 1px rgba(255,255,255,0.04),
+              0 24px 64px rgba(0,0,0,0.6),
+              0 0 80px rgba(82,235,207,0.06);
+}
+.mockupChrome {
+  display: flex; align-items: center; gap: 10px;
+  padding: 10px 14px;
+  background: #0b1220;
+  border-bottom: 1px solid rgba(255,255,255,0.07);
+}
+.mockupDots { display: flex; gap: 5px; }
+.mockupDots span {
+  width: 10px; height: 10px; border-radius: 50%;
+}
+.mockupDots span:nth-child(1) { background: #ff5f57; }
+.mockupDots span:nth-child(2) { background: #febc2e; }
+.mockupDots span:nth-child(3) { background: #28c840; }
+.mockupUrl {
+  flex: 1; text-align: center;
+  font-size: 0.7rem; color: rgba(255,255,255,0.28);
+  font-family: "SFMono-Regular", Consolas, monospace;
 }
 
-.urlInput {
+.mockupBody {
+  display: grid; grid-template-columns: 220px 1fr; min-height: 320px;
+}
+
+.mockupSidebar {
+  background: #0c1323; border-right: 1px solid rgba(255,255,255,0.07);
+  padding: 16px 12px;
+}
+.mockupSideLabel {
+  font-size: 0.58rem; font-weight: 700; letter-spacing: 0.12em;
+  color: rgba(255,255,255,0.25); padding: 0 4px; margin-bottom: 10px;
+}
+.mockupSourceItem {
+  display: flex; align-items: center; gap: 9px;
+  padding: 8px 8px; border-radius: 7px;
+  margin-bottom: 3px; cursor: default;
+  transition: background 0.13s;
+}
+.mockupSourceItem:hover { background: rgba(255,255,255,0.04); }
+.mockupSourceIcon { font-size: 1rem; flex-shrink: 0; width: 18px; text-align: center; }
+.mockupSourceName { font-size: 0.72rem; font-weight: 600; color: #c8d8ff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.mockupSourceSub  { font-size: 0.62rem; color: rgba(200,216,255,0.38); margin-top: 1px; }
+
+.mockupMain { padding: 20px; display: flex; flex-direction: column; gap: 14px; }
+
+.mockupCard {
+  background: #111d32; border: 1px solid rgba(255,255,255,0.07);
+  border-radius: 10px; padding: 16px;
   flex: 1;
-  padding: 1rem 1.5rem;
-  font-size: 1.125rem;
+}
+.mockupCardLabel {
+  font-size: 0.6rem; font-weight: 700; letter-spacing: 0.12em;
+  color: rgba(89,174,255,0.7); margin-bottom: 10px;
+}
+.mockupQuestion {
+  font-size: 0.88rem; font-weight: 600; color: #d8e8ff;
+  margin-bottom: 14px; line-height: 1.4;
+}
+.mockupOptions { display: flex; flex-direction: column; gap: 7px; }
+.mockupOption {
+  display: flex; align-items: center; gap: 9px;
+  padding: 8px 12px; border-radius: 7px;
+  background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.07);
+  cursor: pointer; text-align: left; width: 100%;
+  font-size: 0.78rem; color: rgba(220,235,255,0.7);
   font-family: inherit;
-  outline: none;
+  transition: border-color 0.13s, background 0.13s, color 0.13s;
+}
+.mockupOption:hover { background: rgba(255,255,255,0.07); border-color: rgba(255,255,255,0.14); color: #e2eaff; }
+.mockupOptionCorrect { background: rgba(82,235,207,0.1) !important; border-color: rgba(82,235,207,0.4) !important; color: #52ebcf !important; }
+.mockupOptionWrong   { background: rgba(255,80,80,0.1)  !important; border-color: rgba(255,80,80,0.35)  !important; color: #ff6060 !important; }
+.mockupOptionKey {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 18px; height: 18px; border-radius: 4px;
+  border: 1px solid rgba(255,255,255,0.12);
+  font-size: 0.62rem; font-weight: 700; flex-shrink: 0;
 }
 
-.urlInput:focus {
-  box-shadow: var(--shadow-brutal);
+.mockupProgress { display: flex; align-items: center; gap: 10px; }
+.mockupProgressTrack {
+  flex: 1; height: 4px; border-radius: 4px; background: rgba(255,255,255,0.07); overflow: hidden;
 }
+.mockupProgressFill { height: 100%; background: linear-gradient(90deg, #52ebcf, #59aeff); border-radius: 4px; }
+.mockupProgressLabel { font-size: 0.65rem; color: rgba(226,234,255,0.35); white-space: nowrap; }
 
-.ctaButton {
-  height: 100%;
-}
-
-.features {
-  padding: 5rem 0;
-  background-color: #e2e8f0;
-}
-
-.sectionTitle {
-  font-size: 2.5rem;
+/* ── Logo strip ───────────────────────────────────────────────────────── */
+.logoStrip {
+  position: relative; z-index: 5;
   text-align: center;
-  margin-bottom: 3rem;
+  padding: clamp(2rem, 4vw, 3rem) clamp(1rem, 4vw, 3rem);
+  border-top: 1px solid rgba(255,255,255,0.05);
+}
+.logoStripLabel {
+  font-size: 0.68rem; font-weight: 600; letter-spacing: 0.12em;
+  color: rgba(226,234,255,0.3); text-transform: uppercase; margin-bottom: 1.2rem;
+}
+.logos { display: flex; flex-wrap: wrap; justify-content: center; gap: 0.6rem; }
+.logoChip {
+  font-size: 0.75rem; font-weight: 600;
+  color: rgba(226,234,255,0.4); border: 1px solid rgba(255,255,255,0.08);
+  padding: 0.3rem 0.9rem; border-radius: 6px;
+  background: rgba(255,255,255,0.02);
+  transition: color 0.13s, border-color 0.13s;
+}
+.logoChip:hover { color: rgba(226,234,255,0.7); border-color: rgba(255,255,255,0.15); }
+
+/* ── Shared section styles ────────────────────────────────────────────── */
+.sectionEyebrow {
+  font-size: 0.65rem; font-weight: 700; letter-spacing: 0.16em;
+  color: rgba(89,174,255,0.65); text-align: center; margin-bottom: 0.7rem;
+}
+.sectionH2 {
+  font-size: clamp(1.6rem, 3.5vw, 2.4rem); font-weight: 800;
+  letter-spacing: -0.038em; color: #e2eaff;
+  text-align: center; margin: 0 auto 2.8rem; max-width: 580px; line-height: 1.2;
 }
 
-.grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-  gap: 2rem;
-  padding: 0 2rem;
+/* ── Features ─────────────────────────────────────────────────────────── */
+.features {
+  position: relative; z-index: 5;
+  max-width: 1080px; margin: 0 auto;
+  padding: clamp(2.5rem, 5vw, 5rem) clamp(1rem, 4vw, 3rem);
+  border-top: 1px solid rgba(255,255,255,0.05);
 }
+.featuresHeader { margin-bottom: 0; }
 
+.featureGrid {
+  display: grid; grid-template-columns: repeat(3, 1fr); gap: 1rem;
+}
 .featureCard {
-  display: flex;
-  flex-direction: column;
-  gap: 1rem;
+  padding: 1.6rem 1.4rem;
+  border-radius: 14px; border: 1px solid rgba(255,255,255,0.07);
+  background: rgba(10,18,32,0.7);
+  backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
+  transition: border-color 0.18s, transform 0.18s;
 }
-
-.featureIcon {
-  font-size: 3rem;
-  margin-bottom: 0.5rem;
+.featureCard:hover { border-color: color-mix(in srgb, var(--c, #52ebcf) 40%, transparent); transform: translateY(-3px); }
+.featureCardTop { display: flex; align-items: center; justify-content: space-between; margin-bottom: 1rem; }
+.featureStep {
+  font-size: 0.6rem; font-weight: 800; letter-spacing: 0.08em;
+  color: rgba(226,234,255,0.22); font-family: "SFMono-Regular", monospace;
 }
+.featureIcon { font-size: 1.5rem; filter: drop-shadow(0 0 6px var(--c, #52ebcf)); }
+.featureTitle { font-size: 0.97rem; font-weight: 700; color: #e2eaff; letter-spacing: -0.02em; margin: 0 0 0.55rem; }
+.featureBody  { font-size: 0.84rem; color: rgba(226,234,255,0.5); line-height: 1.7; margin: 0; }
 
-@media (max-width: 768px) {
-  .title {
-    font-size: 2.5rem;
-  }
-  .inputGroup {
-    flex-direction: column;
-  }
-  .ctaButton {
-    width: 100%;
-  }
+/* ── Testimonials ─────────────────────────────────────────────────────── */
+.testimonials {
+  position: relative; z-index: 5;
+  max-width: 1080px; margin: 0 auto;
+  padding: clamp(2.5rem, 5vw, 5rem) clamp(1rem, 4vw, 3rem);
+  border-top: 1px solid rgba(255,255,255,0.05);
+}
+.testimonialGrid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1rem; }
+.testimonialCard {
+  padding: 1.5rem;
+  border-radius: 14px; border: 1px solid rgba(255,255,255,0.07);
+  background: rgba(10,18,32,0.65);
+  backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
+}
+.testimonialQuote { font-size: 0.88rem; color: rgba(226,234,255,0.68); line-height: 1.7; margin: 0 0 1.2rem; font-style: italic; }
+.testimonialAuthor { display: flex; align-items: center; gap: 10px; }
+.testimonialAvatar {
+  width: 34px; height: 34px; border-radius: 50%; flex-shrink: 0;
+  background: linear-gradient(135deg, #52ebcf, #59aeff);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 0.62rem; font-weight: 800; color: #0a0f1a;
+}
+.testimonialName { font-size: 0.82rem; font-weight: 700; color: #e2eaff; margin: 0; }
+.testimonialRole { font-size: 0.72rem; color: rgba(226,234,255,0.38); margin: 2px 0 0; }
+
+/* ── Pricing ──────────────────────────────────────────────────────────── */
+.pricing {
+  position: relative; z-index: 5;
+  max-width: 760px; margin: 0 auto;
+  padding: clamp(2.5rem, 5vw, 5rem) clamp(1rem, 4vw, 3rem);
+  border-top: 1px solid rgba(255,255,255,0.05);
+}
+.pricingGrid { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
+.pricingCard {
+  position: relative;
+  padding: 1.8rem;
+  border-radius: 16px; border: 1px solid rgba(255,255,255,0.08);
+  background: rgba(10,18,32,0.7);
+  backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
+  display: flex; flex-direction: column; gap: 1.4rem;
+}
+.pricingCardPro {
+  border-color: rgba(82,235,207,0.25);
+  background: rgba(82,235,207,0.03);
+  box-shadow: 0 0 0 1px rgba(82,235,207,0.1), 0 8px 32px rgba(0,0,0,0.3);
+}
+.pricingBadge {
+  position: absolute; top: -12px; left: 50%; transform: translateX(-50%);
+  font-size: 0.65rem; font-weight: 700; letter-spacing: 0.06em;
+  background: linear-gradient(120deg, #52ebcf, #59aeff);
+  color: #0a0f1a; padding: 0.22rem 0.75rem; border-radius: 999px;
+}
+.pricingTop {}
+.pricingTier { font-size: 0.8rem; font-weight: 700; color: rgba(226,234,255,0.5); letter-spacing: 0.06em; margin-bottom: 0.4rem; }
+.pricingPrice { font-size: 2.2rem; font-weight: 900; letter-spacing: -0.05em; color: #e2eaff; line-height: 1; margin-bottom: 0.5rem; }
+.pricingPeriod { font-size: 0.85rem; font-weight: 400; color: rgba(226,234,255,0.4); letter-spacing: 0; margin-left: 2px; }
+.pricingDesc { font-size: 0.82rem; color: rgba(226,234,255,0.45); }
+.pricingFeatures { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 0.55rem; flex: 1; }
+.pricingFeature {
+  display: flex; align-items: center; gap: 9px;
+  font-size: 0.83rem; color: rgba(226,234,255,0.65);
+}
+.pricingFeature svg { color: #52ebcf; flex-shrink: 0; }
+
+/* ── FAQ ──────────────────────────────────────────────────────────────── */
+.faq {
+  position: relative; z-index: 5;
+  max-width: 680px; margin: 0 auto;
+  padding: clamp(2.5rem, 5vw, 5rem) clamp(1rem, 4vw, 3rem);
+  border-top: 1px solid rgba(255,255,255,0.05);
+}
+.faqList { display: flex; flex-direction: column; gap: 0; }
+.faqItem {
+  border-bottom: 1px solid rgba(255,255,255,0.06);
+  overflow: hidden;
+}
+.faqQ {
+  display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  width: 100%; padding: 1.1rem 0; background: none; border: none;
+  font-family: inherit; font-size: 0.92rem; font-weight: 600; color: #e2eaff;
+  cursor: pointer; text-align: left; transition: color 0.13s;
+}
+.faqQ:hover { color: #52ebcf; }
+.faqChevron { font-size: 1.2rem; color: rgba(226,234,255,0.4); flex-shrink: 0; line-height: 1; }
+.faqA { font-size: 0.85rem; color: rgba(226,234,255,0.55); line-height: 1.75; padding: 0 0 1.1rem; margin: 0; }
+
+/* ── Final CTA ────────────────────────────────────────────────────────── */
+.finalCta {
+  position: relative; z-index: 5;
+  padding: clamp(3rem, 6vw, 6rem) clamp(1rem, 4vw, 3rem);
+  border-top: 1px solid rgba(255,255,255,0.05);
+}
+.finalCtaInner {
+  position: relative; overflow: hidden;
+  max-width: 780px; margin: 0 auto;
+  text-align: center;
+  padding: clamp(2.5rem, 5vw, 4rem);
+  border-radius: 20px; border: 1px solid rgba(82,235,207,0.14);
+  background: rgba(10,18,32,0.8); backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px);
+}
+.finalCtaGlow {
+  position: absolute; inset: 0; pointer-events: none;
+  background: radial-gradient(ellipse 70% 50% at 50% 0%, rgba(82,235,207,0.07) 0%, transparent 65%);
+}
+.finalCtaH2 {
+  font-size: clamp(1.8rem, 4vw, 2.8rem); font-weight: 900;
+  letter-spacing: -0.044em; color: #e2eaff; margin: 0 0 0.8rem; line-height: 1.1;
+}
+.finalCtaSub { font-size: 0.95rem; color: rgba(226,234,255,0.5); margin: 0 0 1.8rem; line-height: 1.7; }
+
+/* ── Footer ───────────────────────────────────────────────────────────── */
+.footer {
+  position: relative; z-index: 5;
+  border-top: 1px solid rgba(255,255,255,0.05);
+  padding: clamp(1.2rem, 3vw, 2rem) clamp(1rem, 4vw, 3.5rem);
+}
+.footerTop {
+  display: flex; align-items: center; justify-content: space-between;
+  flex-wrap: wrap; gap: 1rem; margin-bottom: 1.2rem;
+}
+.footerBrand {
+  display: flex; align-items: center; gap: 8px;
+  font-size: 0.85rem; font-weight: 800; letter-spacing: -0.03em; color: #e2eaff;
+}
+.footerLinks { display: flex; flex-wrap: wrap; gap: 0.2rem; }
+.footerLink {
+  font-size: 0.8rem; color: rgba(226,234,255,0.38); text-decoration: none;
+  padding: 0.3rem 0.7rem; border-radius: 6px;
+  transition: color 0.13s, background 0.13s;
+}
+.footerLink:hover { color: rgba(226,234,255,0.8); background: rgba(255,255,255,0.04); }
+.footerBottom { font-size: 0.72rem; color: rgba(226,234,255,0.22); }
+
+/* ── Responsive ───────────────────────────────────────────────────────── */
+@media (max-width: 900px) {
+  .featureGrid      { grid-template-columns: 1fr; }
+  .testimonialGrid  { grid-template-columns: 1fr; }
+  .mockupBody       { grid-template-columns: 1fr; }
+  .mockupSidebar    { display: none; }
+}
+@media (max-width: 680px) {
+  .pricingGrid      { grid-template-columns: 1fr; }
+  .navLinks         { display: none; }
+  .footerLinks      { display: none; }
+}
+@media (max-width: 440px) {
+  .navGhost         { display: none; }
+  .trust            { flex-direction: column; }
 }

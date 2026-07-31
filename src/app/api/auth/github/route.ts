@@ -12,3 +12,4 @@ export async function GET() {
     `https://github.com/login/oauth/authorize?${params.toString()}`
   );
 }
+

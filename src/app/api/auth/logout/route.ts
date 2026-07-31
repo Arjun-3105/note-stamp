@@ -6,3 +6,4 @@ export async function POST() {
   jar.delete("gh_token");
   return NextResponse.json({ ok: true });
 }
+

@@ -1,4 +1,4 @@
-import { callAI } from "@/lib/openrouter";
+import { callAI } from "@/lib/ai";
 import { parseAiJson } from "@/lib/json";
 import { NextRequest, NextResponse } from "next/server";
 
@@ -58,8 +58,8 @@ Rules:
 - strengths should be derived from right questions, max 3 items
 `;
 
-    const raw = await callAI(prompt, { jsonMode: true });
-    const data = parseAiJson(raw);
+    const result = await callAI({ systemPrompt: 'You are an expert learning coach. Return ONLY valid JSON.', userPrompt: prompt, jsonMode: true, tier: 'fast' });
+    const data = parseAiJson(result.content);
     return NextResponse.json(data);
   } catch (error) {
     return NextResponse.json(
@@ -68,3 +68,4 @@ Rules:
     );
   }
 }
+

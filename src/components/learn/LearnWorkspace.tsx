@@ -317,18 +317,20 @@ export const LearnWorkspace: React.FC<LearnWorkspaceProps> = ({
     );
     if (SRClass) {
       recognitionRef.current = new SRClass();
-      recognitionRef.current.continuous = true;
-      recognitionRef.current.interimResults = true;
-      recognitionRef.current.onresult = (e: { resultIndex: number; results: SpeechRecognitionResultList }) => {
-        let fin = '', interim = '';
-        for (let i = e.resultIndex; i < e.results.length; i++) {
-          if (e.results[i].isFinal) fin += e.results[i][0].transcript;
-          else interim += e.results[i][0].transcript;
-        }
-        setInterimTranscript(interim);
-        if (fin) setUserExplanation(p => p + (p.endsWith(' ') ? '' : ' ') + fin);
-      };
-      recognitionRef.current.onerror = () => setIsRecording(false);
+      if (recognitionRef.current) {
+        recognitionRef.current.continuous = true;
+        recognitionRef.current.interimResults = true;
+        recognitionRef.current.onresult = (e: { resultIndex: number; results: SpeechRecognitionResultList }) => {
+          let fin = '', interim = '';
+          for (let i = e.resultIndex; i < e.results.length; i++) {
+            if (e.results[i].isFinal) fin += e.results[i][0].transcript;
+            else interim += e.results[i][0].transcript;
+          }
+          setInterimTranscript(interim);
+          if (fin) setUserExplanation(p => p + (p.endsWith(' ') ? '' : ' ') + fin);
+        };
+        recognitionRef.current.onerror = () => setIsRecording(false);
+      }
     }
     return () => {
       synthRef.current?.cancel();
@@ -600,21 +602,21 @@ export const LearnWorkspace: React.FC<LearnWorkspaceProps> = ({
   const { main, sub } = getTopContent();
 
   const getBg = () => {
-    if (orbPassed)   return 'radial-gradient(ellipse 90% 70% at 50% 45%, #07140f 0%, #080808 100%)';
-    if (isRecording) return 'radial-gradient(ellipse 90% 70% at 50% 45%, #080d18 0%, #080808 100%)';
-    if (isSpeaking)  return 'radial-gradient(ellipse 90% 70% at 50% 45%, #101010 0%, #080808 100%)';
-    return 'radial-gradient(ellipse 90% 70% at 50% 45%, #0e0e0e 0%, #080808 100%)';
+    if (orbPassed)   return 'radial-gradient(ellipse 90% 70% at 50% 45%, #022c22 0%, var(--color-slate-950) 100%)';
+    if (isRecording) return 'radial-gradient(ellipse 90% 70% at 50% 45%, #1e1b4b 0%, var(--color-slate-950) 100%)';
+    if (isSpeaking)  return 'radial-gradient(ellipse 90% 70% at 50% 45%, #1e293b 0%, var(--color-slate-950) 100%)';
+    return 'radial-gradient(ellipse 90% 70% at 50% 45%, #0f172a 0%, var(--color-slate-950) 100%)';
   };
 
   const mainFontSize = main.length > 40 ? 18 : 23;
-  const mainColor    = orbPassed ? '#6ee7a0' : '#ffffff';
+  const mainColor    = orbPassed ? '#34d399' : '#f8fafc';
 
   return (
     <div style={{
       display: 'flex', flexDirection: 'column',
       width: '100%', minHeight: '100vh',
-      background: getBg(), color: '#fff',
-      fontFamily: "'Inter', system-ui, sans-serif",
+      background: getBg(), color: 'var(--color-slate-100)',
+      fontFamily: 'var(--font-sans)',
       position: 'relative', transition: 'background 2s ease',
       overflow: 'hidden',
     }}>
@@ -911,3 +913,4 @@ export const LearnWorkspace: React.FC<LearnWorkspaceProps> = ({
     </div>
   );
 };
+

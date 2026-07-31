@@ -1,7 +1,7 @@
 import { NextRequest } from "next/server";
 import { cookies } from "next/headers";
 import { fetchRepoFiles } from "@/lib/github";
-import { callAI } from "@/lib/openrouter";
+import { callAI } from "@/lib/ai";
 import { parseAiJson } from "@/lib/json";
 
 /* ── event shape ───────────────────────────────────────────────────────── */
@@ -262,8 +262,8 @@ IMPORTANT: Return ONLY valid JSON. Every requirement AND checkpoint must appear 
 Score >= 70 means passed: true.
 `;
 
-        const raw  = await callAI(prompt, { jsonMode: true });
-        const data = parseAiJson<AssessResult>(raw);
+        const aiResult = await callAI({ systemPrompt: 'You are a strict but fair coding evaluator. Return ONLY valid JSON.', userPrompt: prompt, jsonMode: true, tier: 'mid' });
+        const data = parseAiJson<AssessResult>(aiResult.content);
         send({ type: "ai_done" });
         send({ type: "result", data });
 
@@ -283,3 +283,4 @@ Score >= 70 means passed: true.
     },
   });
 }
+

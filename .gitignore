@@ -40,3 +40,14 @@ yarn-error.log*
 *.tsbuildinfo
 next-env.d.ts
 claude.md
+
+# hardhat & build outputs
+artifacts/
+cache/
+
+# local dev & data
+.vscode/
+data/
+check_source.ts
+fix_transcript.*
+

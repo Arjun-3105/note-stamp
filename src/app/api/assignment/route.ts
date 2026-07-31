@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { callAI } from "@/lib/openrouter";
+import { callAI } from "@/lib/ai";
 import { parseAiJson } from "@/lib/json";
 
 export async function POST(req: NextRequest) {
@@ -59,7 +59,7 @@ Transcript (${transcript.length} chars total):
 ${excerpt}
 `;
 
-    const raw = await callAI(prompt, { jsonMode: true });
+    const result = await callAI({ systemPrompt: 'You are a strict technical instructor. Return ONLY valid JSON.', userPrompt: prompt, jsonMode: true, maxTokens: 2048, tier: 'fast' });
     const data = parseAiJson<{
       isCodingVideo: boolean;
       title: string;
@@ -71,7 +71,7 @@ ${excerpt}
       topic: string;
       starterIdea?: string;
       quiz?: { question: string; options: string[]; answerIndex: number }[];
-    }>(raw);
+    }>(result.content);
 
     return NextResponse.json(data);
   } catch (error) {
@@ -81,3 +81,4 @@ ${excerpt}
     );
   }
 }
+

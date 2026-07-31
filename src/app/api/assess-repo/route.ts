@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { fetchRepoFiles } from "@/lib/github";
-import { callAI } from "@/lib/openrouter";
+import { callAI } from "@/lib/ai";
 import { parseAiJson } from "@/lib/json";
 
 function parseRepoUrl(repoUrl: string) {
@@ -65,8 +65,8 @@ Expected Format:
 Score >= 70 means passed true.
 `;
 
-    const raw = await callAI(prompt, { jsonMode: true });
-    const data = parseAiJson(raw);
+    const result = await callAI({ systemPrompt: 'You are a strict but fair coding evaluator. Return ONLY valid JSON.', userPrompt: prompt, jsonMode: true, tier: 'mid' });
+    const data = parseAiJson(result.content);
     return NextResponse.json(data);
   } catch (error) {
     return NextResponse.json(
@@ -75,3 +75,4 @@ Score >= 70 means passed true.
     );
   }
 }
+

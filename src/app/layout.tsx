@@ -1,21 +1,10 @@
 import type { Metadata } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
-import { Sidebar } from "@/components/layout/Sidebar";
-
-const geistSans = Geist({
-  variable: "--font-geist-sans",
-  subsets: ["latin"],
-});
-
-const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
-  subsets: ["latin"],
-});
+import { ClerkClientProvider } from "@/components/providers/ClerkClientProvider";
 
 export const metadata: Metadata = {
-  title: "LearnLoop | Proof of Learning",
-  description: "AI learning companion that builds assignments, assesses repos, and mints proof NFTs.",
+  title: "LearnLoop | Learn & Earn Badges",
+  description: "Multi-source learning workspace with AI tutor, flashcards, quizzes, and learning passport.",
 };
 
 export default function RootLayout({
@@ -24,15 +13,10 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className={`${geistSans.variable} ${geistMono.variable}`}>
-      <body>
-        <div className="flex h-screen overflow-hidden">
-          <Sidebar />
-          <main className="flex-1 overflow-y-auto">
-            {children}
-          </main>
-        </div>
-      </body>
-    </html>
+    <ClerkClientProvider>
+      <html lang="en">
+        <body>{children}</body>
+      </html>
+    </ClerkClientProvider>
   );
 }

@@ -1,16 +1,48 @@
 import { NextRequest, NextResponse } from "next/server";
-import { callAI } from "@/lib/openrouter";
+import { callAI } from "@/lib/ai";
 import { parseAiJson } from "@/lib/json";
+import { getLocalTranscript, getLocalRoadmap, saveLocalRoadmap } from "@/lib/local-db";
+import { getSource } from "@/lib/db/sources";
 
 export async function POST(req: NextRequest) {
   try {
-    const { transcript } = await req.json() as { transcript?: string };
+    const { sourceId, detailed } = await req.json() as { sourceId?: string; detailed?: boolean };
 
-    if (!transcript) {
-      return NextResponse.json({ error: "Transcript is required" }, { status: 400 });
+    if (!sourceId) {
+      return NextResponse.json({ error: "Source ID is required" }, { status: 400 });
     }
 
-    const excerpt = transcript.slice(0, 14_000);
+    const cachedRoadmap = await getLocalRoadmap(sourceId, !!detailed);
+    if (cachedRoadmap) {
+      return NextResponse.json(cachedRoadmap);
+    }
+
+    // Attempt to load full transcript locally
+    let sourceContent = await getLocalTranscript(sourceId);
+    
+    // Fallback to Appwrite summary
+    if (!sourceContent) {
+      const source = await getSource(sourceId);
+      if (source) {
+        let meta: any = {};
+        try { meta = JSON.parse(source.metadata as unknown as string || '{}'); } catch {}
+        if (meta.summary) {
+          sourceContent = JSON.stringify(meta.summary);
+        }
+      }
+    }
+
+    if (!sourceContent) {
+      return NextResponse.json({ error: "Source content not found" }, { status: 404 });
+    }
+
+    const excerpt = sourceContent.slice(0, 40000);
+
+    const detailedInstructions = detailed 
+      ? `\n- Produce a VERY DETAILED roadmap (25-40 nodes) covering all nuanced topics.
+- FOCUS ON DEEPER FOUNDATIONAL CONTEXT: Ensure every prerequisite is thoroughly mapped and explained.
+- Include a very robust "FOUNDATION" layer that breaks down even basic assumptions before moving to CORE.`
+      : `\n- Produce as many nodes as needed (typically 8-20 for most videos)`;
 
     const prompt = `
 You are a senior curriculum architect. Your task is to extract ALL important concepts from this transcript and build a comprehensive, densely-connected learning dependency map.
@@ -21,12 +53,11 @@ CRITICAL CONNECTIVITY REQUIREMENT: NO ORPHANED NODES ALLOWED
 
 EVERY SINGLE NODE must have AT LEAST ONE incoming OR outgoing edge. Completely isolated nodes are FORBIDDEN.
 
-COMPREHENSIVE NODE GENERATION:
-- Produce as many nodes as needed (typically 8-20 for most videos)
+COMPREHENSIVE NODE GENERATION:${detailedInstructions}
 - Organize into 3 hierarchical layers:
-  1. FOUNDATION: Core prerequisites (first 2-3 nodes)
-  2. CORE: Main topic nodes (middle 60% of nodes) 
-  3. ADVANCED: Extensions & applications (last 2-3 nodes)
+  1. FOUNDATION: Core prerequisites (first nodes)
+  2. CORE: Main topic nodes (middle nodes) 
+  3. ADVANCED: Extensions & applications (last nodes)
 - Create "bridge nodes" that explicitly link different learning paths together
 
 EDGE DENSITY TARGET: Aim for 1.2 to 1.5 edges per node on average
@@ -111,12 +142,18 @@ EXAMPLE for 5-node graph (showing proper structure):
 }
 Note: Node IDs 1-5 all have edges. No orphans. 5 edges for 5 nodes = 1.0 edge ratio.
 
-Transcript (${transcript.length} chars):
+Transcript/Summary excerpt (${sourceContent.length} chars available):
 ${excerpt}
 `;
 
-    const raw = await callAI(prompt, { jsonMode: true });
-    const data = parseAiJson<{ nodes: unknown[]; edges: unknown[] }>(raw);
+    const result = await callAI({
+      systemPrompt: 'You are a senior curriculum architect. Return ONLY valid JSON.',
+      userPrompt: prompt,
+      jsonMode: true,
+      tier: 'fast',
+      maxTokens: 4096,
+    });
+    const data = parseAiJson<{ nodes: unknown[]; edges: unknown[] }>(result.content);
 
     // Validate and clean data (no hard limit - allow comprehensive graphs)
     if (Array.isArray(data.nodes)) {
@@ -130,11 +167,15 @@ ${excerpt}
       }
     }
 
+    await saveLocalRoadmap(sourceId, data, !!detailed);
+
     return NextResponse.json(data);
   } catch (error) {
+    console.error('Concept map error:', error);
     return NextResponse.json(
       { error: error instanceof Error ? error.message : "Failed to generate concept map" },
       { status: 500 }
     );
   }
 }
+
