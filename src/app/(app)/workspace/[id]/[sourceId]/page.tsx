@@ -18,6 +18,24 @@ const BlockNoteEditor = dynamic(
   { ssr: false, loading: () => null }
 );
 
+const CodeSandbox = dynamic(
+  () => import('@/components/sandbox/CodeSandbox').then(m => m.CodeSandbox),
+  { ssr: false, loading: () => (
+    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', color: '#64748b', fontSize: 13 }}>
+      Loading Python Sandbox…
+    </div>
+  )}
+);
+
+const MathWhiteboard = dynamic(
+  () => import('@/components/math/MathWhiteboard').then(m => m.MathWhiteboard),
+  { ssr: false, loading: () => (
+    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', color: '#64748b', fontSize: 13 }}>
+      Loading Math Whiteboard…
+    </div>
+  )}
+);
+
 const SOURCE_META: Record<string, { icon: string; label: string; color: string }> = {
   youtube: { icon: '▶', label: 'YouTube',    color: '#ef4444' },
   pdf:     { icon: '⬜', label: 'PDF',         color: '#3b82f6' },
@@ -257,18 +275,18 @@ export default function SourceDetailPage({
             </h1>
             
             {/* Navigation Tabs */}
-            <div className="flex items-center gap-1 border-b border-[#252B36] pb-3">
-              {['Learn', 'Notes', 'Mind Map', 'Flashcards', 'Quiz', 'Practice'].map(tab => (
+            <div className="flex items-center gap-1 border-b border-[#252B36] pb-3 flex-wrap">
+              {['Learn', 'Notes', 'Mind Map', 'Flashcards', 'Quiz', 'Practice', 'Sandbox', 'Math'].map(tab => (
                 <button
                   key={tab}
                   onClick={() => setActiveTab(tab)}
                   className="px-4 py-1.5 rounded-[14px] text-[13px] font-bold transition-all"
                   style={{
-                    background: activeTab === tab ? '#7C5CFF' : 'transparent',
+                    background: activeTab === tab ? tab === 'Sandbox' ? '#10b981' : tab === 'Math' ? '#f59e0b' : '#7C5CFF' : 'transparent',
                     color: activeTab === tab ? '#ffffff' : '#A2A8B5',
                   }}
                 >
-                  {tab}
+                  {tab === 'Sandbox' ? '⚙ Sandbox' : tab === 'Math' ? '∑ Math' : tab}
                 </button>
               ))}
             </div>
@@ -394,8 +412,22 @@ export default function SourceDetailPage({
               </div>
             )}
 
+            {/* Sandbox Tab: Python execution with trace visualization */}
+            {activeTab === 'Sandbox' && (
+              <div style={{ height: 'calc(100vh - 200px)', minHeight: 500 }}>
+                <CodeSandbox sourceId={source.$id} />
+              </div>
+            )}
+
+            {/* Math Tab: Step-by-step algebra verification with Desmos */}
+            {activeTab === 'Math' && (
+              <div style={{ height: 'calc(100vh - 200px)', minHeight: 500 }}>
+                <MathWhiteboard sourceId={source.$id} workspaceId={id} />
+              </div>
+            )}
+
             {/* Other tabs fallback */}
-            {!['Learn', 'Notes'].includes(activeTab) && (
+            {!['Learn', 'Notes', 'Sandbox', 'Math'].includes(activeTab) && (
               <div className="bg-[#151922] rounded-[20px] p-12 text-center border border-[#252B36] shadow-sm space-y-3 max-w-md mx-auto mt-8">
                 <div className="text-3xl">✦</div>
                 <h3 className="text-base font-bold text-[#F5F6F8]">{activeTab}</h3>

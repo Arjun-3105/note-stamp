@@ -46,8 +46,8 @@ export async function POST(req: NextRequest) {
       mode as AssistantMode
     );
 
-    // Build context from source/quiz/roadmap data
-    const context = await buildAssistantContext(contextType as ContextType, contextId);
+    // Build context from source/quiz/roadmap data (with mastery state for source contexts)
+    const context = await buildAssistantContext(contextType as ContextType, contextId, userId);
 
     // Build mode-specific system prompt
     const modeConfig = getModeConfig(mode as AssistantMode);

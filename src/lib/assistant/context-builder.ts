@@ -8,15 +8,17 @@ export interface AssistantContext {
 }
 
 /**
- * Build context for assistant based on what the user is learning about
+ * Build context for assistant based on what the user is learning about.
+ * Pass studentId to inject the student's mastery state into source contexts.
  */
 export async function buildAssistantContext(
   contextType: ContextType,
-  contextId: string
+  contextId: string,
+  studentId?: string
 ): Promise<AssistantContext> {
   switch (contextType) {
     case 'source':
-      return buildSourceContext(contextId);
+      return buildSourceContext(contextId, studentId);
     case 'quiz':
       return buildQuizContext(contextId);
     case 'roadmap':
@@ -32,7 +34,8 @@ export async function buildAssistantContext(
   }
 }
 
-async function buildSourceContext(sourceId: string): Promise<AssistantContext> {
+
+async function buildSourceContext(sourceId: string, studentId?: string): Promise<AssistantContext> {
   // Import here to avoid circular deps
   const { getSource } = await import('@/lib/db/sources');
   const { listNotesBySource } = await import('@/lib/db/notes');
@@ -59,6 +62,20 @@ async function buildSourceContext(sourceId: string): Promise<AssistantContext> {
     }
   }
 
+  // Inject student mastery state if studentId is available
+  let masterySummary = '';
+  if (studentId) {
+    try {
+      const { listMasteryForStudent, buildMasterySummary } = await import('@/lib/db/mastery');
+      const masteryList = await listMasteryForStudent(studentId, source.workspaceId);
+      if (masteryList.length > 0) {
+        masterySummary = '\n\n' + buildMasterySummary(masteryList);
+      }
+    } catch {
+      // Mastery fetch failure is non-fatal — silently skip
+    }
+  }
+
   return {
     type: 'source',
     title: source.title,
@@ -71,10 +88,11 @@ ${source.url ? `URL: ${source.url}` : ''}
 ${sourceContent ? sourceContent.slice(0, 300000) : '(No content available)'}
 
 ## Student Notes:
-${notesContent || '(No notes yet)'}
+${notesContent || '(No notes yet)'}${masterySummary}
     `.trim(),
   };
 }
+
 
 async function buildQuizContext(quizAttemptId: string): Promise<AssistantContext> {
   const { getQuizAttempt } = await import('@/lib/db/quizzes');

@@ -218,3 +218,13 @@ export interface ApiError {
   code: 'upgrade_required' | 'rate_limited' | 'not_found' | 'unauthorized' | 'invalid_input'
   retryAfter?: number
 }
+
+// MathLive web component JSX declaration
+declare global {
+  namespace JSX {
+    interface IntrinsicElements {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      'math-field': any;
+    }
+  }
+}

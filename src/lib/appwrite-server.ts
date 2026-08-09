@@ -36,5 +36,8 @@ export const COLLECTIONS = {
   BADGES: 'badges',
   USAGE_LOG: 'usage_log',
   CHAT_SESSIONS: 'chat_sessions',
+  SANDBOX_TRACES: 'sandbox_traces',
+  MATH_ATTEMPTS: 'math_attempts',
+  CONCEPT_MASTERY: 'concept_mastery',
 } as const;
 
