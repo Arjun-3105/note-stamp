@@ -1,5 +1,4 @@
-import { ID, Query } from 'node-appwrite';
-import { serverDatabases, DB_ID, COLLECTIONS } from '@/lib/appwrite-server';
+import { supabaseServer, TABLES, mapDoc } from '@/lib/supabase-server';
 
 export type BadgeType = 'micro' | 'skill' | 'master';
 
@@ -37,48 +36,74 @@ export interface CreateBadgeInput {
 }
 
 export async function createBadge(data: CreateBadgeInput): Promise<Badge> {
-  return serverDatabases.createDocument(DB_ID, COLLECTIONS.BADGES, ID.unique(), {
-    userId: data.userId,
-    type: data.type,
-    title: data.title,
-    skill: data.skill,
-    sourceId: data.sourceId || null,
-    workspaceId: data.workspaceId || null,
-    evidenceIds: JSON.stringify(data.evidenceIds),
-    componentBadgeIds: data.componentBadgeIds ? JSON.stringify(data.componentBadgeIds) : null,
-    score: data.score,
-    tokenId: null,
-    txHash: null,
-    ipfsHash: null,
-    metadataUri: null,
-    mintedAt: null,
-    createdAt: new Date().toISOString(),
-    idempotencyKey: data.idempotencyKey,
-  }) as unknown as Badge;
+  const { data: doc, error } = await supabaseServer
+    .from(TABLES.BADGES)
+    .insert({
+      userId: data.userId,
+      type: data.type,
+      title: data.title,
+      skill: data.skill,
+      sourceId: data.sourceId || null,
+      workspaceId: data.workspaceId || null,
+      evidenceIds: JSON.stringify(data.evidenceIds),
+      componentBadgeIds: data.componentBadgeIds ? JSON.stringify(data.componentBadgeIds) : null,
+      score: data.score,
+      tokenId: null,
+      txHash: null,
+      ipfsHash: null,
+      metadataUri: null,
+      mintedAt: null,
+      createdAt: new Date().toISOString(),
+      idempotencyKey: data.idempotencyKey,
+    })
+    .select()
+    .single();
+
+  if (error) throw new Error(`Failed to create badge: ${error.message}`);
+  return mapDoc<Badge>(doc);
 }
 
 export async function getBadge(badgeId: string): Promise<Badge | null> {
   try {
-    return await serverDatabases.getDocument(DB_ID, COLLECTIONS.BADGES, badgeId) as unknown as Badge;
+    const { data, error } = await supabaseServer
+      .from(TABLES.BADGES)
+      .select('*')
+      .eq('id', badgeId)
+      .maybeSingle();
+
+    if (error || !data) return null;
+    return mapDoc<Badge>(data);
   } catch {
     return null;
   }
 }
 
 export async function listBadgesByUser(userId: string, type?: BadgeType): Promise<Badge[]> {
-  const queries = [Query.equal('userId', userId), Query.orderDesc('$createdAt')];
-  if (type) queries.push(Query.equal('type', type));
-  const result = await serverDatabases.listDocuments(DB_ID, COLLECTIONS.BADGES, queries);
-  return result.documents as unknown as Badge[];
+  let query = supabaseServer
+    .from(TABLES.BADGES)
+    .select('*')
+    .eq('userId', userId);
+
+  if (type) {
+    query = query.eq('type', type);
+  }
+
+  const { data, error } = await query.order('createdAt', { ascending: false });
+
+  if (error || !data) return [];
+  return mapDoc<Badge[]>(data);
 }
 
 export async function getBadgeByIdempotencyKey(idempotencyKey: string): Promise<Badge | null> {
   try {
-    const result = await serverDatabases.listDocuments(DB_ID, COLLECTIONS.BADGES, [
-      Query.equal('idempotencyKey', idempotencyKey),
-      Query.limit(1),
-    ]);
-    return (result.documents[0] as unknown as Badge) || null;
+    const { data, error } = await supabaseServer
+      .from(TABLES.BADGES)
+      .select('*')
+      .eq('idempotencyKey', idempotencyKey)
+      .maybeSingle();
+
+    if (error || !data) return null;
+    return mapDoc<Badge>(data);
   } catch {
     return null;
   }
@@ -91,13 +116,21 @@ export async function updateBadgeMint(
   ipfsHash: string,
   metadataUri: string
 ): Promise<Badge> {
-  return serverDatabases.updateDocument(DB_ID, COLLECTIONS.BADGES, badgeId, {
-    tokenId,
-    txHash,
-    ipfsHash,
-    metadataUri,
-    mintedAt: new Date().toISOString(),
-  }) as unknown as Badge;
+  const { data, error } = await supabaseServer
+    .from(TABLES.BADGES)
+    .update({
+      tokenId,
+      txHash,
+      ipfsHash,
+      metadataUri,
+      mintedAt: new Date().toISOString(),
+    })
+    .eq('id', badgeId)
+    .select()
+    .single();
+
+  if (error) throw new Error(`Failed to update badge mint: ${error.message}`);
+  return mapDoc<Badge>(data);
 }
 
 export function parseBadgeEvidenceIds(badge: Badge): string[] {
@@ -108,4 +141,3 @@ export function parseBadgeComponentIds(badge: Badge): string[] {
   try { return badge.componentBadgeIds ? JSON.parse(badge.componentBadgeIds) : []; }
   catch { return []; }
 }
-

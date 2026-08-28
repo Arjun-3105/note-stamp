@@ -32,18 +32,21 @@ export interface RoadmapNodeInfo {
   difficulty?: 'beginner' | 'intermediate' | 'advanced';
 }
 
+import { ParsedCitation } from '@/lib/citations';
+
 export interface AssistantPanelProps {
   sourceId?: string;
   contextType?: 'source' | 'quiz' | 'roadmap' | 'problem';
   contextId?: string;
-  title?: string;
-  initialText?: string;
   initialMode?: AssistantMode;
+  mode?: AssistantMode;
+  onModeChange?: (mode: AssistantMode) => void;
   focusTopic?: FocusTopic | null;
   noteContent?: string;
   sourceTitle?: string;
   roadmapNodes?: RoadmapNodeInfo[];
   onSelectNode?: (node: RoadmapNodeInfo) => void;
+  onCitationClick?: (citation: ParsedCitation) => void;
 }
 
 /* ─── Mode meta ──────────────────────────────────────────────── */
@@ -173,30 +176,19 @@ function TeacherPanel({
   contextId,
   focusTopic,
   sourceTitle,
+  onCitationClick,
 }: {
   contextId?: string;
   focusTopic?: FocusTopic | null;
   sourceTitle?: string;
+  onCitationClick?: (citation: ParsedCitation) => void;
 }) {
   const { messages, loading, error, sendMessage } = useChat(contextId, 'teacher');
   const messagesEndRef = useRef<HTMLDivElement>(null);
-  const hasAutoStarted = useRef(false);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
-
-  // Auto-send opening question when panel mounts or topic changes
-  useEffect(() => {
-    if (!contextId || hasAutoStarted.current) return;
-    hasAutoStarted.current = true;
-    const topic = focusTopic?.label || sourceTitle || 'this topic';
-    const question = focusTopic
-      ? `I'm now focusing on "${focusTopic.label}". Give me a brief overview of this concept, then ask me one Socratic question to check my understanding. Keep it conversational and engaging.`
-      : `I've just started studying "${topic}". Give me a quick, energetic intro to what I'm about to learn, then ask me what I already know about it. Make it feel like a live class, not a chatbot.`;
-    sendMessage(question, focusTopic);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [contextId, focusTopic?.id]);
 
   const quickPrompts = [
     { label: 'Give me a hint', icon: '💡' },
@@ -210,20 +202,6 @@ function TeacherPanel({
 
   return (
     <div className="h-full flex flex-col" style={{ background: '#151922' }}>
-      {/* Header */}
-      <div className="px-4 pt-4 pb-2 shrink-0 flex items-center gap-2">
-        <div className="w-7 h-7 rounded-[10px] flex items-center justify-center text-xs text-white font-bold shadow-sm"
-          style={{ background: 'linear-gradient(135deg, #7C5CFF, #8b5cf6)' }}>
-          ✦
-        </div>
-        <span className="text-[13px] font-bold text-[#F5F6F8]">AI Teacher</span>
-        <button className="ml-auto w-6 h-6 flex items-center justify-center rounded-lg text-[#A2A8B5] hover:text-white transition-colors">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-            <path d="M12 5v14M5 12l7-7 7 7"/>
-          </svg>
-        </button>
-      </div>
-
       {/* Messages */}
       <div className="flex-1 overflow-y-auto px-4 pb-3 space-y-3 min-h-0" style={{ scrollbarWidth: 'none' }}>
         {messages.length === 0 && !loading && (
@@ -233,12 +211,12 @@ function TeacherPanel({
               👨‍🏫
             </div>
             <p className="text-[#A2A8B5] text-xs text-center leading-relaxed px-2">
-              Setting up your learning session…
+              Ask about {focusTopic?.label || sourceTitle || 'this source'} when you're ready.
             </p>
           </div>
         )}
         {messages.map((msg, idx) => (
-          <MessageBubble key={idx} message={msg} accentColor="#7C5CFF" />
+          <MessageBubble key={idx} message={msg} accentColor="#7C5CFF" onCitationClick={onCitationClick} />
         ))}
         {loading && (
           <div className="flex gap-1.5 items-center px-1 py-2 ml-9">
@@ -324,9 +302,11 @@ function TeacherPanel({
 function CorrectorPanel({
   contextId,
   noteContent,
+  onCitationClick,
 }: {
   contextId?: string;
   noteContent?: string;
+  onCitationClick?: (citation: ParsedCitation) => void;
 }) {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const [loading, setLoading] = useState(false);
@@ -379,15 +359,6 @@ function CorrectorPanel({
 
   return (
     <div className="h-full flex flex-col" style={{ background: '#16161f' }}>
-      {/* Header */}
-      <div className="px-4 pt-4 pb-2 shrink-0 flex items-center gap-2">
-        <div className="w-7 h-7 rounded-xl flex items-center justify-center text-sm"
-          style={{ background: 'linear-gradient(135deg, #f59e0b, #f97316)' }}>
-          ✏️
-        </div>
-        <span className="text-[13px] font-bold text-white">AI Corrector</span>
-      </div>
-
       {/* Tab bar */}
       <div className="px-4 shrink-0 flex gap-4" style={{ borderBottom: '1px solid #2a2a38' }}>
         {(['feedback', 'evidence'] as const).map((tab) => (
@@ -636,29 +607,19 @@ function RoadmapGuidePanel({
   contextId,
   roadmapNodes,
   onSelectNode,
+  onCitationClick,
 }: {
   contextId?: string;
   roadmapNodes?: RoadmapNodeInfo[];
   onSelectNode?: (node: RoadmapNodeInfo) => void;
+  onCitationClick?: (citation: ParsedCitation) => void;
 }) {
   const { messages, loading, error, sendMessage } = useChat(contextId, 'roadmap_guide');
   const messagesEndRef = useRef<HTMLDivElement>(null);
-  const hasAutoStarted = useRef(false);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
-
-  // Auto-send based on real roadmap nodes
-  useEffect(() => {
-    if (!contextId || hasAutoStarted.current) return;
-    hasAutoStarted.current = true;
-    const nodesContext = roadmapNodes?.length
-      ? `Based on the concept map, here are the key topics: ${roadmapNodes.map(n => n.label).join(', ')}. Tell me what to focus on next based on these topics.`
-      : `I'm exploring this source material. What should I focus on to build a strong foundation?`;
-    sendMessage(nodesContext);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [contextId]);
 
   // Group nodes by difficulty
   const foundation = roadmapNodes?.filter(n => n.difficulty === 'beginner' || !n.difficulty) || [];
@@ -706,20 +667,6 @@ function RoadmapGuidePanel({
 
   return (
     <div className="h-full flex flex-col" style={{ background: '#16161f' }}>
-      {/* Header */}
-      <div className="px-4 pt-4 pb-3 shrink-0 flex items-center gap-2">
-        <div className="w-7 h-7 rounded-xl flex items-center justify-center text-sm"
-          style={{ background: 'linear-gradient(135deg, #3b82f6, #6366f1)' }}>
-          🗺️
-        </div>
-        <span className="text-[13px] font-bold text-white">AI Roadmap Guide</span>
-        <button className="ml-auto w-6 h-6 flex items-center justify-center rounded-lg text-[#A2A8B5] hover:text-white transition-colors">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-            <polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 .49-3.5"/>
-          </svg>
-        </button>
-      </div>
-
       {/* Content */}
       <div className="flex-1 overflow-y-auto px-4 pb-3 space-y-4 min-h-0" style={{ scrollbarWidth: 'none' }}>
 
@@ -775,7 +722,7 @@ function RoadmapGuidePanel({
 
         {/* Chat messages after first message */}
         {messages.slice(1).map((msg, idx) => (
-          <MessageBubble key={idx} message={msg} accentColor="#3b82f6" />
+          <MessageBubble key={idx} message={msg} accentColor="#3b82f6" onCitationClick={onCitationClick} />
         ))}
         {loading && messages.length > 0 && (
           <div className="flex gap-1.5 items-center py-2">
@@ -811,29 +758,21 @@ function ProblemSolverPanel({
   contextId,
   sourceTitle,
   noteContent,
+  onCitationClick,
 }: {
   contextId?: string;
   sourceTitle?: string;
   noteContent?: string;
+  onCitationClick?: (citation: ParsedCitation) => void;
 }) {
   const { messages, loading, error, sendMessage } = useChat(contextId, 'problem_solver');
   const messagesEndRef = useRef<HTMLDivElement>(null);
-  const hasAutoStarted = useRef(false);
   const [scratchpad, setScratchpad] = useState(noteContent || '');
   const [activeStep, setActiveStep] = useState(1);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
-
-  // Auto-generate a problem statement
-  useEffect(() => {
-    if (!contextId || hasAutoStarted.current) return;
-    hasAutoStarted.current = true;
-    const prompt = `I'm studying "${sourceTitle || 'this topic'}". Generate one concise, well-structured practice problem based on the source material. After the problem, ask me what approach I'd take. Format: State the problem clearly, then ask "How would you approach this?"`;
-    sendMessage(prompt);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [contextId]);
 
   // Extract steps from AI messages
   const extractedSteps = messages
@@ -862,19 +801,6 @@ function ProblemSolverPanel({
 
   return (
     <div className="h-full flex flex-col" style={{ background: '#16161f' }}>
-      {/* Header */}
-      <div className="px-4 pt-4 pb-3 shrink-0 flex items-center gap-2">
-        <div className="w-7 h-7 rounded-xl flex items-center justify-center text-sm"
-          style={{ background: 'linear-gradient(135deg, #a855f7, #6366f1)' }}>
-          ⚡
-        </div>
-        <span className="text-[13px] font-bold text-white">AI Problem Solver</span>
-        <span className="ml-auto text-[10px] px-2 py-0.5 rounded-full font-semibold"
-          style={{ color: '#a855f7', background: 'rgba(168,85,247,0.1)', border: '1px solid rgba(168,85,247,0.2)' }}>
-          You solve, AI guides
-        </span>
-      </div>
-
       {/* Content */}
       <div className="flex-1 overflow-y-auto px-4 pb-3 space-y-3 min-h-0" style={{ scrollbarWidth: 'none' }}>
 
@@ -975,7 +901,7 @@ function ProblemSolverPanel({
 
         {/* AI guidance messages (after first) */}
         {messages.slice(1).map((msg, idx) => (
-          <MessageBubble key={idx} message={msg} accentColor="#a855f7" />
+          <MessageBubble key={idx} message={msg} accentColor="#a855f7" onCitationClick={onCitationClick} />
         ))}
 
         {loading && messages.length > 0 && (
@@ -1029,7 +955,7 @@ function ProblemSolverPanel({
 }
 
 /* ─── Quiz Hint panel ─────────────────────────────────────────── */
-function QuizHintPanel({ contextId }: { contextId?: string }) {
+function QuizHintPanel({ contextId, onCitationClick }: { contextId?: string; onCitationClick?: (citation: ParsedCitation) => void }) {
   const { messages, loading, error, sendMessage } = useChat(contextId, 'quiz_hint');
   const messagesEndRef = useRef<HTMLDivElement>(null);
   useEffect(() => { messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [messages]);
@@ -1046,7 +972,7 @@ function QuizHintPanel({ contextId }: { contextId?: string }) {
             </p>
           </div>
         )}
-        {messages.map((msg, idx) => <MessageBubble key={idx} message={msg} accentColor="#10b981" />)}
+        {messages.map((msg, idx) => <MessageBubble key={idx} message={msg} accentColor="#10b981" onCitationClick={onCitationClick} />)}
         {loading && (
           <div className="flex gap-1.5 items-center py-2 ml-9">
             {[0, 1, 2].map(i => (
@@ -1119,31 +1045,21 @@ export function AssistantPanel({
   sourceId,
   contextType = 'source',
   contextId = sourceId,
-  title = 'AI Assistant',
-  initialText,
   initialMode,
+  mode: controlledMode,
+  onModeChange,
   focusTopic,
   noteContent,
   sourceTitle,
   roadmapNodes,
   onSelectNode,
+  onCitationClick,
 }: AssistantPanelProps) {
-  const [mode, setMode] = useState<AssistantMode>(initialMode || 'teacher');
-  const prevMode = useRef(mode);
-
-  // Smooth mode transition
-  const [transitioning, setTransitioning] = useState(false);
-  const handleModeChange = (newMode: AssistantMode) => {
-    if (newMode === mode) return;
-    setTransitioning(true);
-    setTimeout(() => {
-      setMode(newMode);
-      prevMode.current = newMode;
-      setTransitioning(false);
-    }, 150);
-  };
-
-  const meta = MODE_META[mode];
+  // Controlled mode from parent; fallback to initialMode for uncontrolled use
+  const mode = controlledMode ?? initialMode ?? 'teacher';
+  const handleModeChange = useCallback((newMode: AssistantMode) => {
+    onModeChange?.(newMode);
+  }, [onModeChange]);
 
   return (
     <div
@@ -1153,37 +1069,21 @@ export function AssistantPanel({
       {/* Mode tabs */}
       <ModeTabs mode={mode} onModeChange={handleModeChange} />
 
-      {/* Mode label */}
-      <div
-        className="shrink-0 px-4 py-2 flex items-center gap-2"
-        style={{ borderBottom: '1px solid #252B36' }}
-      >
-        <div
-          className="w-6 h-6 rounded-lg flex items-center justify-center text-white text-[11px] font-bold shrink-0 shadow-sm"
-          style={{ background: meta.gradient }}
-        >
-          ✦
-        </div>
-        <span className="text-[13px] font-bold text-[#F5F6F8]">{meta.label}</span>
-        <div className="ml-auto w-2 h-2 rounded-full animate-pulse" style={{ background: meta.color }} />
-      </div>
-
-      {/* Mode-specific panel with fade transition */}
-      <div
-        className="flex-1 min-h-0 overflow-hidden transition-opacity duration-150"
-        style={{ opacity: transitioning ? 0 : 1 }}
-      >
+      {/* Mode-specific panel */}
+      <div className="flex-1 min-h-0 overflow-hidden">
         {mode === 'teacher' && (
           <TeacherPanel
             contextId={contextId}
             focusTopic={focusTopic}
             sourceTitle={sourceTitle}
+            onCitationClick={onCitationClick}
           />
         )}
         {mode === 'corrector' && (
           <CorrectorPanel
             contextId={contextId}
             noteContent={noteContent}
+            onCitationClick={onCitationClick}
           />
         )}
         {mode === 'roadmap_guide' && (
@@ -1191,6 +1091,7 @@ export function AssistantPanel({
             contextId={contextId}
             roadmapNodes={roadmapNodes}
             onSelectNode={onSelectNode}
+            onCitationClick={onCitationClick}
           />
         )}
         {mode === 'problem_solver' && (
@@ -1198,10 +1099,11 @@ export function AssistantPanel({
             contextId={contextId}
             sourceTitle={sourceTitle}
             noteContent={noteContent}
+            onCitationClick={onCitationClick}
           />
         )}
         {mode === 'quiz_hint' && (
-          <QuizHintPanel contextId={contextId} />
+          <QuizHintPanel contextId={contextId} onCitationClick={onCitationClick} />
         )}
       </div>
     </div>

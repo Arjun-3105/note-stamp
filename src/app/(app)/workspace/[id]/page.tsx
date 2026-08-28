@@ -13,6 +13,7 @@ export default function WorkspaceDetailPage({ params }: { params: Promise<{ id: 
   const [sources, setSources] = useState<Source[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [progressMap, setProgressMap] = useState<Record<string, { doneChunks:number; totalChunks:number; donePages:number; totalPages:number; doneTopics:number; totalTopics:number; pct:number }>>({});
 
   useEffect(() => {
     if (!userId) return;
@@ -29,7 +30,28 @@ export default function WorkspaceDetailPage({ params }: { params: Promise<{ id: 
         const srcRes = await fetch(`/api/workspaces/${id}/sources`);
         if (srcRes.ok) {
           const srcData = await srcRes.json();
-          setSources(srcData.sources || []);
+          const srcs = srcData.sources || [];
+          setSources(srcs);
+          // fetch progress per source
+          try {
+            const pRes = await fetch(`/api/progress?workspaceId=${encodeURIComponent(id)}`);
+            if (pRes.ok) {
+              const pData = await pRes.json();
+              const map: Record<string, any> = {};
+              for (const p of (pData.progresses || [])) {
+                const doneChunks = (p.completedChunks||[]).length;
+                const totalChunks = p.totalChunks || doneChunks || 0;
+                const donePages = (p.completedPages||[]).length;
+                const totalPages = p.totalPages || donePages || 0;
+                const doneTopics = (p.completedTopics||[]).length;
+                const totalTopics = p.totalTopics || doneTopics || 0;
+                const parts = [totalChunks? doneChunks/totalChunks : null, totalPages? donePages/totalPages : null, totalTopics? doneTopics/totalTopics : null].filter(v=>v!==null) as number[];
+                const pct = parts.length ? Math.round((parts.reduce((a,b)=>a+b,0)/parts.length)*100) : 0;
+                map[p.sourceId] = { doneChunks, totalChunks, donePages, totalPages, doneTopics, totalTopics, pct };
+              }
+              setProgressMap(map);
+            }
+          } catch {}
         }
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Unknown error');
@@ -74,9 +96,16 @@ export default function WorkspaceDetailPage({ params }: { params: Promise<{ id: 
           {workspace.description && (
             <p className="mt-2 text-[#A2A8B5]">{workspace.description}</p>
           )}
-          <div className="mt-4 flex gap-4 text-sm text-[#A2A8B5]">
+          <div className="mt-4 flex gap-3 text-sm text-[#A2A8B5] flex-wrap">
             <span>📚 {workspace.sourceCount} sources</span>
             <span>✓ {workspace.completedUnits}/{workspace.totalUnits} units completed</span>
+            {Object.keys(progressMap).length > 0 && (() => {
+              const vals = Object.values(progressMap);
+              const avg = vals.length ? Math.round(vals.reduce((s,v)=>s+v.pct,0)/vals.length) : 0;
+              const totalDone = vals.reduce((s,v)=>s+(v.doneChunks+v.donePages+v.doneTopics),0);
+              const totalAll = vals.reduce((s,v)=>s+(v.totalChunks+v.totalPages+v.totalTopics),0);
+              return <span className="px-2 py-0.5 rounded-full bg-[#42C67A]/10 border border-[#42C67A]/20 text-[#42C67A] text-xs font-bold">{avg}% tracked • {totalDone}/{totalAll} items</span>;
+            })()}
           </div>
         </div>
         <Link
@@ -100,7 +129,9 @@ export default function WorkspaceDetailPage({ params }: { params: Promise<{ id: 
         </div>
       ) : (
         <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
-          {sources.map(source => (
+          {sources.map(source => {
+            const prog = progressMap[source.$id];
+            return (
             <Link
               key={source.$id}
               href={`/learn/${id}/${source.$id}`}
@@ -113,7 +144,7 @@ export default function WorkspaceDetailPage({ params }: { params: Promise<{ id: 
                   {source.sourceType === 'url' && '🔗'}
                   {source.sourceType === 'text' && '📝'}
                 </div>
-                <div className="flex-1">
+                <div className="flex-1 min-w-0">
                   <h3 className="font-bold text-[#F5F6F8] line-clamp-2">{source.title}</h3>
                   <p className="text-xs text-[#A2A8B5] mt-1 capitalize font-medium">{source.sourceType}</p>
                   <p className="text-xs text-[#A2A8B5] mt-2 font-medium">
@@ -123,10 +154,25 @@ export default function WorkspaceDetailPage({ params }: { params: Promise<{ id: 
                       'text-[#FF6A6A] font-bold'
                     }>{source.status}</span>
                   </p>
+                  {prog && (prog.totalChunks>0 || prog.totalPages>0 || prog.totalTopics>0) ? (
+                    <div className="mt-3 space-y-1.5">
+                      <div className="h-1.5 rounded-full bg-[#0F1115] border border-[#252B36] overflow-hidden">
+                        <div className="h-full bg-[#42C67A] transition-all" style={{ width: `${prog.pct}%` }} />
+                      </div>
+                      <div className="flex gap-1.5 flex-wrap">
+                        {prog.totalChunks>0 && <span className="text-[11px] px-1.5 py-0.5 rounded-full bg-[#0F1115] border border-[#252B36] text-[#A2A8B5]">Chunks {prog.doneChunks}/{prog.totalChunks}</span>}
+                        {prog.totalPages>0 && <span className="text-[11px] px-1.5 py-0.5 rounded-full bg-[#0F1115] border border-[#252B36] text-[#A2A8B5]">Pages {prog.donePages}/{prog.totalPages}</span>}
+                        {prog.totalTopics>0 && <span className="text-[11px] px-1.5 py-0.5 rounded-full bg-[#42C67A]/10 border border-[#42C67A]/20 text-[#42C67A] font-bold">Topics {prog.doneTopics}/{prog.totalTopics}</span>}
+                        <span className="text-[11px] font-bold text-[#42C67A]">{prog.pct}%</span>
+                      </div>
+                    </div>
+                  ) : (
+                    <p className="text-[11px] text-[#6b7280] mt-2">No progress yet — open to track chunks/pages/topics</p>
+                  )}
                 </div>
               </div>
             </Link>
-          ))}
+          )})}
         </div>
       )}
     </div>

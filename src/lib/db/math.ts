@@ -1,5 +1,4 @@
-import { ID, Query } from 'node-appwrite';
-import { serverDatabases, DB_ID, COLLECTIONS } from '@/lib/appwrite-server';
+import { supabaseServer, TABLES, mapDoc } from '@/lib/supabase-server';
 
 export interface MathStep {
   latex: string;
@@ -30,30 +29,55 @@ export interface CreateMathAttemptInput {
 }
 
 export async function createMathAttempt(data: CreateMathAttemptInput): Promise<MathAttempt> {
-  return serverDatabases.createDocument(DB_ID, COLLECTIONS.MATH_ATTEMPTS, ID.unique(), {
-    problemId: data.problemId,
-    userId: data.userId,
-    workspaceId: data.workspaceId,
-    steps: JSON.stringify(data.steps),
-    finalAnswerCorrect: data.finalAnswerCorrect,
-    confidenceScore: data.confidenceScore,
-    createdAt: new Date().toISOString(),
-  }) as unknown as MathAttempt;
+  const { data: doc, error } = await supabaseServer
+    .from(TABLES.MATH_ATTEMPTS)
+    .insert({
+      problemId: data.problemId,
+      userId: data.userId,
+      workspaceId: data.workspaceId,
+      steps: JSON.stringify(data.steps),
+      finalAnswerCorrect: data.finalAnswerCorrect,
+      confidenceScore: data.confidenceScore,
+      createdAt: new Date().toISOString(),
+    })
+    .select()
+    .single();
+
+  if (error) throw new Error(`Failed to create math attempt: ${error.message}`);
+  return mapDoc<MathAttempt>(doc);
 }
 
 export async function getMathAttempt(id: string): Promise<MathAttempt | null> {
   try {
-    return await serverDatabases.getDocument(DB_ID, COLLECTIONS.MATH_ATTEMPTS, id) as unknown as MathAttempt;
+    const { data, error } = await supabaseServer
+      .from(TABLES.MATH_ATTEMPTS)
+      .select('*')
+      .eq('id', id)
+      .maybeSingle();
+
+    if (error || !data) return null;
+    return mapDoc<MathAttempt>(data);
   } catch {
     return null;
   }
 }
 
 export async function listMathAttemptsByUser(userId: string, workspaceId?: string): Promise<MathAttempt[]> {
-  const queries = [Query.equal('userId', userId), Query.orderDesc('createdAt'), Query.limit(50)];
-  if (workspaceId) queries.push(Query.equal('workspaceId', workspaceId));
-  const result = await serverDatabases.listDocuments(DB_ID, COLLECTIONS.MATH_ATTEMPTS, queries);
-  return result.documents as unknown as MathAttempt[];
+  let query = supabaseServer
+    .from(TABLES.MATH_ATTEMPTS)
+    .select('*')
+    .eq('userId', userId);
+
+  if (workspaceId) {
+    query = query.eq('workspaceId', workspaceId);
+  }
+
+  const { data, error } = await query
+    .order('createdAt', { ascending: false })
+    .limit(50);
+
+  if (error || !data) return [];
+  return mapDoc<MathAttempt[]>(data);
 }
 
 export function parseMathSteps(attempt: MathAttempt): MathStep[] {

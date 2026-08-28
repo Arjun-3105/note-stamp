@@ -3,6 +3,7 @@ import { callAI } from "@/lib/ai";
 import { parseAiJson } from "@/lib/json";
 import { getLocalTranscript, getLocalRoadmap, saveLocalRoadmap } from "@/lib/local-db";
 import { getSource } from "@/lib/db/sources";
+import { buildSourceCoverageContext } from "@/lib/source-chunks";
 
 export async function POST(req: NextRequest) {
   try {
@@ -17,8 +18,10 @@ export async function POST(req: NextRequest) {
       return NextResponse.json(cachedRoadmap);
     }
 
-    // Attempt to load full transcript locally
-    let sourceContent = await getLocalTranscript(sourceId);
+    let sourceContent = await buildSourceCoverageContext(sourceId);
+    if (!sourceContent) {
+      sourceContent = await getLocalTranscript(sourceId);
+    }
     
     // Fallback to Appwrite summary
     if (!sourceContent) {
@@ -36,7 +39,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Source content not found" }, { status: 404 });
     }
 
-    const excerpt = sourceContent.slice(0, 40000);
+    const excerpt = sourceContent.slice(0, detailed ? 70000 : 45000);
 
     const detailedInstructions = detailed 
       ? `\n- Produce a VERY DETAILED roadmap (25-40 nodes) covering all nuanced topics.

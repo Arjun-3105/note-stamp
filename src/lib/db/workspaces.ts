@@ -1,5 +1,4 @@
-import { ID, Query } from 'node-appwrite';
-import { serverDatabases, DB_ID, COLLECTIONS } from '@/lib/appwrite-server';
+import { supabaseServer, TABLES, mapDoc } from '@/lib/supabase-server';
 
 export interface Workspace {
   $id: string;
@@ -22,47 +21,70 @@ export interface CreateWorkspaceInput {
 
 export async function createWorkspace(data: CreateWorkspaceInput): Promise<Workspace> {
   const now = new Date().toISOString();
-  return serverDatabases.createDocument(DB_ID, COLLECTIONS.WORKSPACES, ID.unique(), {
-    userId: data.userId,
-    title: data.title,
-    description: data.description || null,
-    status: 'active',
-    sourceCount: 0,
-    completedUnits: 0,
-    totalUnits: 0,
-    createdAt: now,
-    updatedAt: now,
-  }) as unknown as Workspace;
+  const { data: doc, error } = await supabaseServer
+    .from(TABLES.WORKSPACES)
+    .insert({
+      userId: data.userId,
+      title: data.title,
+      description: data.description || null,
+      status: 'active',
+      sourceCount: 0,
+      completedUnits: 0,
+      totalUnits: 0,
+      createdAt: now,
+      updatedAt: now,
+    })
+    .select()
+    .single();
+
+  if (error) throw new Error(`Failed to create workspace: ${error.message}`);
+  return mapDoc<Workspace>(doc);
 }
 
 export async function getWorkspace(workspaceId: string): Promise<Workspace | null> {
   try {
-    return await serverDatabases.getDocument(
-      DB_ID,
-      COLLECTIONS.WORKSPACES,
-      workspaceId
-    ) as unknown as Workspace;
+    const { data, error } = await supabaseServer
+      .from(TABLES.WORKSPACES)
+      .select('*')
+      .eq('id', workspaceId)
+      .maybeSingle();
+
+    if (error || !data) return null;
+    return mapDoc<Workspace>(data);
   } catch {
     return null;
   }
 }
 
 export async function listWorkspacesByUser(userId: string): Promise<Workspace[]> {
-  const result = await serverDatabases.listDocuments(DB_ID, COLLECTIONS.WORKSPACES, [
-    Query.equal('userId', userId),
-    Query.orderDesc('createdAt'),
-  ]);
-  return result.documents as unknown as Workspace[];
+  const { data, error } = await supabaseServer
+    .from(TABLES.WORKSPACES)
+    .select('*')
+    .eq('userId', userId)
+    .order('createdAt', { ascending: false });
+
+  if (error || !data) return [];
+  return mapDoc<Workspace[]>(data);
 }
 
 export async function updateWorkspace(
   workspaceId: string,
   data: Partial<Workspace>
 ): Promise<Workspace> {
-  return serverDatabases.updateDocument(DB_ID, COLLECTIONS.WORKSPACES, workspaceId, {
-    ...data,
-    updatedAt: new Date().toISOString(),
-  }) as unknown as Workspace;
+  const { $id, ...updatePayload } = data;
+
+  const { data: doc, error } = await supabaseServer
+    .from(TABLES.WORKSPACES)
+    .update({
+      ...updatePayload,
+      updatedAt: new Date().toISOString(),
+    })
+    .eq('id', workspaceId)
+    .select()
+    .single();
+
+  if (error) throw new Error(`Failed to update workspace: ${error.message}`);
+  return mapDoc<Workspace>(doc);
 }
 
 export async function updateWorkspaceSourceCount(
@@ -87,4 +109,3 @@ export async function updateWorkspaceProgress(
 export async function archiveWorkspace(workspaceId: string): Promise<Workspace> {
   return updateWorkspace(workspaceId, { status: 'archived' });
 }
-

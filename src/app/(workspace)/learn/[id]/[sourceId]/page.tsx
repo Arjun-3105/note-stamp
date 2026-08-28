@@ -13,10 +13,32 @@ import type { AssistantMode, FocusTopic, RoadmapNodeInfo } from '@/components/as
 import { TopicRoadmap } from '@/components/learn/TopicRoadmap';
 import type { RoadmapNode, RoadmapEdge } from '@/components/learn/TopicRoadmap';
 import { LearningMapView } from '@/components/learn/LearningMapView';
+import { ParsedCitation } from '@/lib/citations';
+import { FlashcardsView } from '@/components/learn/FlashcardsView';
+import { QuizView } from '@/components/learn/QuizView';
+import { PracticeView } from '@/components/learn/PracticeView';
 
 const BlockNoteEditor = dynamic(
   () => import('@/components/editor/BlockNoteEditor').then(m => m.BlockNoteEditor),
   { ssr: false, loading: () => null }
+);
+
+const CodeSandbox = dynamic(
+  () => import('@/components/sandbox/CodeSandbox').then(m => m.CodeSandbox),
+  { ssr: false, loading: () => (
+    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', color: '#64748b', fontSize: 13 }}>
+      Loading Python Sandbox…
+    </div>
+  )}
+);
+
+const MathWhiteboard = dynamic(
+  () => import('@/components/math/MathWhiteboard').then(m => m.MathWhiteboard),
+  { ssr: false, loading: () => (
+    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', color: '#64748b', fontSize: 13 }}>
+      Loading Math Whiteboard…
+    </div>
+  )}
 );
 
 const SOURCE_META: Record<string, { icon: string; label: string; color: string }> = {
@@ -27,7 +49,7 @@ const SOURCE_META: Record<string, { icon: string; label: string; color: string }
   github:  { icon: '⊞', label: 'GitHub',   color: '#10b981' },
 };
 
-const TABS = ['Learn', 'Notes', 'Mind Map', 'Flashcards', 'Quiz', 'Practice', 'Sources'];
+const TABS = ['Learn', 'Notes', 'Flashcards', 'Quiz', 'Practice', 'Sandbox', 'Math'];
 
 export default function SourceDetailPage({
   params,
@@ -54,6 +76,16 @@ export default function SourceDetailPage({
   const modeMenuRef = useRef<HTMLDivElement>(null);
   const aiPanelRef = useRef<any>(null);
   const sourcePanelRef = useRef<any>(null);
+  const sourceViewerRef = useRef<any>(null);
+
+  const handleCitationClick = useCallback((citation: ParsedCitation) => {
+    if (!sourceViewerRef.current) return;
+    if (citation.pageStart) {
+      sourceViewerRef.current.goToPage(citation.pageStart);
+    } else if (citation.chunkIndex !== undefined) {
+      sourceViewerRef.current.goToChunk(citation.chunkIndex);
+    }
+  }, []);
 
   // Roadmap
   const [roadmapNodes, setRoadmapNodes] = useState<RoadmapNode[]>([]);
@@ -336,7 +368,7 @@ export default function SourceDetailPage({
           {sourceOpen && (
             <>
               <Panel defaultSize={38} minSize={20} className="flex flex-col bg-black">
-                <SourceViewer sourceType={source.sourceType} url={source.url} title={source.title} />
+                <SourceViewer ref={sourceViewerRef} sourceId={source.$id} sourceType={source.sourceType} url={source.url} title={source.title} />
               </Panel>
               <PanelResizeHandle className="w-1 bg-[#252B36] hover:bg-[#7C5CFF] transition-colors cursor-col-resize" />
             </>
@@ -362,8 +394,8 @@ export default function SourceDetailPage({
         {/* Column 1: Source Viewer */}
         {sourceOpen && (
           <>
-            <Panel ref={sourcePanelRef} collapsible defaultSize={38} minSize={20} onCollapse={() => setSourceOpen(false)} onExpand={() => setSourceOpen(true)} className="flex flex-col bg-black">
-              <SourceViewer sourceType={source.sourceType} url={source.url} title={source.title} />
+            <Panel ref={sourcePanelRef} collapsible defaultSize={38} minSize={20} className="flex flex-col bg-black">
+              <SourceViewer ref={sourceViewerRef} sourceId={source.$id} sourceType={source.sourceType} url={source.url} title={source.title} />
             </Panel>
             <PanelResizeHandle className="w-1 bg-[#252B36] hover:bg-[#7C5CFF] transition-colors cursor-col-resize" />
           </>
@@ -376,7 +408,10 @@ export default function SourceDetailPage({
           <div className="px-7 pt-5 pb-0 shrink-0">
             <h1 className="text-[20px] font-bold mb-4 leading-snug text-[#F5F6F8] truncate">{title}</h1>
             <div className="flex items-center gap-0.5 border-b border-[#252B36]">
-              {TABS.map(tab => (
+              {TABS.map(tab => {
+                const label = tab === 'Sandbox' ? '⚙ Sandbox' : tab === 'Math' ? '∑ Math' : tab;
+                const accent = tab === 'Sandbox' ? '#10b981' : tab === 'Math' ? '#f59e0b' : '#7C5CFF';
+                return (
                 <button
                   key={tab}
                   onClick={() => setActiveTab(tab)}
@@ -385,15 +420,15 @@ export default function SourceDetailPage({
                     color: activeTab === tab ? '#F5F6F8' : '#A2A8B5',
                   }}
                 >
-                  {tab}
+                  {label}
                   {activeTab === tab && (
                     <span
                       className="absolute bottom-0 left-0 right-0 h-[2px] rounded-full"
-                      style={{ background: '#7C5CFF' }}
+                      style={{ background: accent }}
                     />
                   )}
                 </button>
-              ))}
+              )})}
             </div>
           </div>
 
@@ -536,8 +571,26 @@ export default function SourceDetailPage({
               </div>
             )}
 
-            {/* ── OTHER TABS ── */}
-            {!['Learn', 'Notes'].includes(activeTab) && (
+            {/* ── SANDBOX TAB ── */}
+            {activeTab === 'Sandbox' && (
+              <div style={{ height: 'calc(100vh - 200px)', minHeight: 500 }}>
+                <CodeSandbox sourceId={source.$id} />
+              </div>
+            )}
+
+            {/* ── MATH TAB ── */}
+            {activeTab === 'Math' && (
+              <div style={{ height: 'calc(100vh - 200px)', minHeight: 500 }}>
+                <MathWhiteboard sourceId={source.$id} workspaceId={id} />
+              </div>
+            )}
+
+            {/* ── FLASHCARDS / QUIZ / PRACTICE ── */}
+            {activeTab === 'Flashcards' && <FlashcardsView sourceId={source.$id} />}
+            {activeTab === 'Quiz' && <QuizView sourceId={source.$id} workspaceId={id} />}
+            {activeTab === 'Practice' && <PracticeView sourceId={source.$id} />}
+
+            {!['Learn', 'Notes', 'Sandbox', 'Math', 'Flashcards', 'Quiz', 'Practice'].includes(activeTab) && (
               <div className="bg-[#151922] rounded-[20px] p-12 text-center border border-[#252B36] max-w-md mx-auto mt-4 space-y-3">
                 <div className="text-3xl">✦</div>
                 <h3 className="text-base font-bold text-[#F5F6F8]">{activeTab}</h3>
@@ -575,11 +628,11 @@ export default function SourceDetailPage({
         {aiOpen && (
           <>
             <PanelResizeHandle className="w-1 bg-[#252B36] hover:bg-[#7C5CFF] transition-colors cursor-col-resize" />
-            <Panel ref={aiPanelRef} collapsible defaultSize={25} minSize={15} onCollapse={() => setAiOpen(false)} onExpand={() => setAiOpen(true)} className="flex flex-col bg-[#0F1115]">
+            <Panel ref={aiPanelRef} collapsible defaultSize={25} minSize={15} className="flex flex-col bg-[#0F1115]">
               <AssistantPanel
                 sourceId={source.$id}
-                title={currentModeMeta.label}
-                initialMode={aiMode}
+                mode={aiMode}
+                onModeChange={setAiMode}
                 focusTopic={selectedTopic}
                 noteContent={noteContent}
                 sourceTitle={title}
@@ -588,6 +641,7 @@ export default function SourceDetailPage({
                   setSelectedTopic({ id: node.id, label: node.label, description: node.description });
                   setAiMode('teacher');
                 }}
+                onCitationClick={handleCitationClick}
               />
             </Panel>
           </>

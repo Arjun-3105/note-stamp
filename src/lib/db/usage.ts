@@ -1,5 +1,4 @@
-import { ID, Query } from 'node-appwrite';
-import { serverDatabases, DB_ID, COLLECTIONS } from '@/lib/appwrite-server';
+import { supabaseServer, TABLES, mapDoc } from '@/lib/supabase-server';
 
 export interface UsageLog {
   $id: string;
@@ -26,16 +25,18 @@ export interface CreateUsageLogInput {
 export async function logUsage(data: CreateUsageLogInput): Promise<void> {
   // Fire-and-forget usage logging — callers should not await this
   try {
-    await serverDatabases.createDocument(DB_ID, COLLECTIONS.USAGE_LOG, ID.unique(), {
-      userId: data.userId,
-      route: data.route,
-      model: data.model || null,
-      inputTokens: data.inputTokens || 0,
-      outputTokens: data.outputTokens || 0,
-      cached: data.cached || false,
-      durationMs: data.durationMs || 0,
-      createdAt: new Date().toISOString(),
-    });
+    await supabaseServer
+      .from(TABLES.USAGE_LOG)
+      .insert({
+        userId: data.userId,
+        route: data.route,
+        model: data.model || null,
+        inputTokens: data.inputTokens || 0,
+        outputTokens: data.outputTokens || 0,
+        cached: data.cached || false,
+        durationMs: data.durationMs || 0,
+        createdAt: new Date().toISOString(),
+      });
   } catch (err) {
     console.error('[usage] Failed to log usage:', err);
   }
@@ -46,13 +47,14 @@ export async function getMonthlyAICallCount(userId: string): Promise<number> {
   startOfMonth.setDate(1);
   startOfMonth.setHours(0, 0, 0, 0);
 
-  const result = await serverDatabases.listDocuments(DB_ID, COLLECTIONS.USAGE_LOG, [
-    Query.equal('userId', userId),
-    Query.greaterThanEqual('createdAt', startOfMonth.toISOString()),
-    Query.limit(1000),
-  ]);
+  const { count, error } = await supabaseServer
+    .from(TABLES.USAGE_LOG)
+    .select('*', { count: 'exact', head: true })
+    .eq('userId', userId)
+    .gte('createdAt', startOfMonth.toISOString());
 
-  return result.total;
+  if (error || count === null) return 0;
+  return count;
 }
 
 export async function getMonthlyTokenUsage(
@@ -61,29 +63,30 @@ export async function getMonthlyTokenUsage(
   const thirtyDaysAgo = new Date();
   thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
 
-  const result = await serverDatabases.listDocuments(DB_ID, COLLECTIONS.USAGE_LOG, [
-    Query.equal('userId', userId),
-    Query.greaterThanEqual('createdAt', thirtyDaysAgo.toISOString()),
-    Query.limit(1000),
-  ]);
+  const { data, error } = await supabaseServer
+    .from(TABLES.USAGE_LOG)
+    .select('inputTokens, outputTokens')
+    .eq('userId', userId)
+    .gte('createdAt', thirtyDaysAgo.toISOString())
+    .limit(1000);
 
-  const logs = result.documents as unknown as UsageLog[];
+  if (error || !data) return { inputTokens: 0, outputTokens: 0 };
   return {
-    inputTokens: logs.reduce((sum, log) => sum + (log.inputTokens || 0), 0),
-    outputTokens: logs.reduce((sum, log) => sum + (log.outputTokens || 0), 0),
+    inputTokens: data.reduce((sum, log) => sum + (log.inputTokens || 0), 0),
+    outputTokens: data.reduce((sum, log) => sum + (log.outputTokens || 0), 0),
   };
 }
 
 export async function getCachedHitRate(userId: string): Promise<number> {
-  const result = await serverDatabases.listDocuments(DB_ID, COLLECTIONS.USAGE_LOG, [
-    Query.equal('userId', userId),
-    Query.orderDesc('createdAt'),
-    Query.limit(100),
-  ]);
+  const { data, error } = await supabaseServer
+    .from(TABLES.USAGE_LOG)
+    .select('cached')
+    .eq('userId', userId)
+    .order('createdAt', { ascending: false })
+    .limit(100);
 
-  const logs = result.documents as unknown as UsageLog[];
-  if (logs.length === 0) return 0;
+  if (error || !data || data.length === 0) return 0;
 
-  const cached = logs.filter(log => log.cached).length;
-  return Math.round((cached / logs.length) * 100);
+  const cached = data.filter(log => log.cached).length;
+  return Math.round((cached / data.length) * 100);
 }

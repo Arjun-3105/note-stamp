@@ -3,6 +3,7 @@
 import { UserButton } from '@clerk/nextjs';
 import Link from 'next/link';
 import { useState } from 'react';
+import { WalletButton } from '@/components/wallet/WalletButton';
 
 export function TopBar() {
   return (
@@ -26,7 +27,8 @@ export function TopBar() {
       </div>
 
       {/* Right */}
-      <div className="flex items-center gap-3 ml-4">
+      <div className="flex items-center gap-2 ml-4">
+        <WalletButton variant="compact" labelConnect="🦊 Connect" className="hidden sm:inline-flex" />
         {/* Notification bell */}
         <button
           className="w-9 h-9 rounded-xl flex items-center justify-center transition-colors hover:bg-gray-100"

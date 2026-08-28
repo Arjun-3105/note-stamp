@@ -13,6 +13,7 @@ import {
   formatUploadedContent,
 } from '@/lib/assistant';
 import { callAI } from '@/lib/ai';
+import { verifyContextAccess } from '@/lib/auth/workspace';
 
 /**
  * POST /api/ai/assistant/upload
@@ -35,6 +36,14 @@ export async function POST(req: NextRequest) {
         { error: 'Missing file or contextId' },
         { status: 400 }
       );
+    }
+
+    // Verify user has access to this context
+    try {
+      await verifyContextAccess('problem', contextId, userId);
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'Access denied';
+      return NextResponse.json({ error: errorMessage }, { status: 403 });
     }
 
     // Force problem_solver mode

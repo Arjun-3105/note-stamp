@@ -1,5 +1,4 @@
-import { ID, Query } from 'node-appwrite';
-import { serverDatabases, DB_ID, COLLECTIONS } from '@/lib/appwrite-server';
+import { supabaseServer, TABLES, mapDoc } from '@/lib/supabase-server';
 
 export interface QuizQuestion {
   id: string;
@@ -29,56 +28,81 @@ export interface CreateQuizAttemptInput {
 }
 
 export async function createQuizAttempt(data: CreateQuizAttemptInput): Promise<QuizAttempt> {
-  return serverDatabases.createDocument(DB_ID, COLLECTIONS.QUIZ_ATTEMPTS, ID.unique(), {
-    sourceId: data.sourceId,
-    userId: data.userId,
-    questions: JSON.stringify(data.questions),
-    answers: JSON.stringify(data.answers),
-    score: data.score,
-    passed: data.score >= 70,
-    takenAt: new Date().toISOString(),
-  }) as unknown as QuizAttempt;
+  const { data: doc, error } = await supabaseServer
+    .from(TABLES.QUIZ_ATTEMPTS)
+    .insert({
+      sourceId: data.sourceId,
+      userId: data.userId,
+      questions: JSON.stringify(data.questions),
+      answers: JSON.stringify(data.answers),
+      score: data.score,
+      passed: data.score >= 80,
+      takenAt: new Date().toISOString(),
+    })
+    .select()
+    .single();
+
+  if (error) throw new Error(`Failed to create quiz attempt: ${error.message}`);
+  return mapDoc<QuizAttempt>(doc);
 }
 
 export async function getQuizAttempt(attemptId: string): Promise<QuizAttempt | null> {
   try {
-    return await serverDatabases.getDocument(
-      DB_ID,
-      COLLECTIONS.QUIZ_ATTEMPTS,
-      attemptId
-    ) as unknown as QuizAttempt;
+    const { data, error } = await supabaseServer
+      .from(TABLES.QUIZ_ATTEMPTS)
+      .select('*')
+      .eq('id', attemptId)
+      .maybeSingle();
+
+    if (error || !data) return null;
+    return mapDoc<QuizAttempt>(data);
   } catch {
     return null;
   }
 }
 
 export async function listQuizAttemptsBySource(sourceId: string): Promise<QuizAttempt[]> {
-  const result = await serverDatabases.listDocuments(DB_ID, COLLECTIONS.QUIZ_ATTEMPTS, [
-    Query.equal('sourceId', sourceId),
-    Query.orderDesc('takenAt'),
-  ]);
-  return result.documents as unknown as QuizAttempt[];
+  const { data, error } = await supabaseServer
+    .from(TABLES.QUIZ_ATTEMPTS)
+    .select('*')
+    .eq('sourceId', sourceId)
+    .order('takenAt', { ascending: false });
+
+  if (error || !data) return [];
+  return mapDoc<QuizAttempt[]>(data);
 }
 
 export async function listQuizAttemptsByUser(
   userId: string,
   sourceId?: string
 ): Promise<QuizAttempt[]> {
-  const queries = [Query.equal('userId', userId), Query.orderDesc('takenAt')];
-  if (sourceId) queries.push(Query.equal('sourceId', sourceId));
-  const result = await serverDatabases.listDocuments(DB_ID, COLLECTIONS.QUIZ_ATTEMPTS, queries);
-  return result.documents as unknown as QuizAttempt[];
+  let query = supabaseServer
+    .from(TABLES.QUIZ_ATTEMPTS)
+    .select('*')
+    .eq('userId', userId);
+
+  if (sourceId) {
+    query = query.eq('sourceId', sourceId);
+  }
+
+  const { data, error } = await query.order('takenAt', { ascending: false });
+
+  if (error || !data) return [];
+  return mapDoc<QuizAttempt[]>(data);
 }
 
 export async function getHighestQuizScore(sourceId: string, userId: string): Promise<number> {
-  const result = await serverDatabases.listDocuments(DB_ID, COLLECTIONS.QUIZ_ATTEMPTS, [
-    Query.equal('sourceId', sourceId),
-    Query.equal('userId', userId),
-    Query.orderDesc('score'),
-    Query.limit(1),
-  ]);
-  if (result.documents.length === 0) return 0;
-  return (result.documents[0] as unknown as QuizAttempt).score;
+  const { data, error } = await supabaseServer
+    .from(TABLES.QUIZ_ATTEMPTS)
+    .select('score')
+    .eq('sourceId', sourceId)
+    .eq('userId', userId)
+    .order('score', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (error || !data) return 0;
+  return data.score;
 }
 
 export function parseQuizQuestions(attempt: QuizAttempt): QuizQuestion[] {
@@ -88,4 +112,3 @@ export function parseQuizQuestions(attempt: QuizAttempt): QuizQuestion[] {
 export function parseQuizAnswers(attempt: QuizAttempt): number[] {
   try { return JSON.parse(attempt.answers); } catch { return []; }
 }
-

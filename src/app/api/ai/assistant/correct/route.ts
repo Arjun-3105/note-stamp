@@ -14,6 +14,7 @@ import {
 import { callAI } from '@/lib/ai';
 import { checkAssistantRateLimit } from '@/lib/ratelimit';
 import { z } from 'zod';
+import { verifyContextAccess } from '@/lib/auth/workspace';
 
 /**
  * POST /api/ai/assistant/correct
@@ -53,6 +54,14 @@ export async function POST(req: NextRequest) {
 
     const body = await req.json();
     const { originalText, contextType, contextId, focusAreas } = CorrectRequestSchema.parse(body);
+
+    // Verify user has access to this context
+    try {
+      await verifyContextAccess(contextType, contextId, userId);
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'Access denied';
+      return NextResponse.json({ error: errorMessage }, { status: 403 });
+    }
 
     // Force corrector mode
     const mode: AssistantMode = 'corrector';

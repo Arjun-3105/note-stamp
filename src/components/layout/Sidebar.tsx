@@ -2,6 +2,7 @@
 import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
+import { WalletButton } from '@/components/wallet/WalletButton';
 
 const NAV_TOP = [
   { href: '/dashboard',        label: 'Home',          icon: HomeIcon },
@@ -65,6 +66,21 @@ export const Sidebar: React.FC = () => {
           );
         })}
       </nav>
+
+      {/* Wallet */}
+      <div className="px-3 pb-3 shrink-0">
+        <div className="rounded-2xl p-3" style={{ background: '#f0fdf4', border: '1px solid #bbf7d0' }}>
+          <div className="flex items-center gap-1.5 mb-1">
+            <span className="text-sm">🦊</span>
+            <span style={{ fontSize: 12, fontWeight: 700, color: '#15803d' }}>Web3 Wallet</span>
+            <span className="ml-auto text-[10px] px-1.5 py-0.5 rounded-full bg-[#15803d] text-white font-bold">Sepolia</span>
+          </div>
+          <p style={{ fontSize: 11, color: '#6b7280', lineHeight: 1.4, marginBottom: 8 }}>
+            Connect MetaMask to mint NFT certificates.
+          </p>
+          <WalletButton variant="compact" labelConnect="Connect MetaMask" className="w-full justify-center" />
+        </div>
+      </div>
 
       {/* Bottom upgrade + invite */}
       <div className="px-3 pb-4 space-y-2 shrink-0">

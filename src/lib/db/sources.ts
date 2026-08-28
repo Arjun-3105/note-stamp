@@ -1,10 +1,8 @@
-import { ID, Query } from 'node-appwrite';
-import { serverDatabases, DB_ID, COLLECTIONS } from '@/lib/appwrite-server';
+import { supabaseServer, TABLES, mapDoc } from '@/lib/supabase-server';
 
 export type SourceType = 'youtube' | 'pdf' | 'url' | 'text' | 'audio';
 export type SourceStatus = 'processing' | 'ready' | 'failed';
 
-// Note: sources use 'type' in Appwrite but we expose 'sourceType' for convenience
 export interface Source {
   $id: string;
   workspaceId: string;
@@ -29,36 +27,61 @@ export interface CreateSourceInput {
   metadata?: Record<string, unknown>;
 }
 
+function mapSource(doc: any): Source {
+  const mapped = mapDoc<any>(doc);
+  if (!mapped) return mapped;
+  return {
+    ...mapped,
+    sourceType: mapped.type,
+  };
+}
+
 export async function createSource(data: CreateSourceInput): Promise<Source> {
-  return serverDatabases.createDocument(DB_ID, COLLECTIONS.SOURCES, ID.unique(), {
-    workspaceId: data.workspaceId,
-    userId: data.userId,
-    type: data.sourceType,
-    title: data.title,
-    url: data.url || null,
-    inputHash: data.inputHash,
-    rawTextPath: null,
-    metadata: data.metadata ? JSON.stringify(data.metadata) : null,
-    status: 'processing',
-    createdAt: new Date().toISOString(),
-  }) as unknown as Source;
+  const { data: doc, error } = await supabaseServer
+    .from(TABLES.SOURCES)
+    .insert({
+      workspaceId: data.workspaceId,
+      userId: data.userId,
+      type: data.sourceType,
+      title: data.title,
+      url: data.url || null,
+      inputHash: data.inputHash,
+      rawTextPath: null,
+      metadata: data.metadata ? JSON.stringify(data.metadata) : null,
+      status: 'processing',
+      createdAt: new Date().toISOString(),
+    })
+    .select()
+    .single();
+
+  if (error) throw new Error(`Failed to create source: ${error.message}`);
+  return mapSource(doc);
 }
 
 export async function getSource(sourceId: string): Promise<Source | null> {
   try {
-    const doc = await serverDatabases.getDocument(DB_ID, COLLECTIONS.SOURCES, sourceId);
-    return { ...doc, sourceType: (doc as any).type } as unknown as Source;
+    const { data, error } = await supabaseServer
+      .from(TABLES.SOURCES)
+      .select('*')
+      .eq('id', sourceId)
+      .maybeSingle();
+
+    if (error || !data) return null;
+    return mapSource(data);
   } catch {
     return null;
   }
 }
 
 export async function listSourcesByWorkspace(workspaceId: string): Promise<Source[]> {
-  const result = await serverDatabases.listDocuments(DB_ID, COLLECTIONS.SOURCES, [
-    Query.equal('workspaceId', workspaceId),
-    Query.orderDesc('createdAt'),
-  ]);
-  return result.documents.map((d: any) => ({ ...d, sourceType: d.type })) as unknown as Source[];
+  const { data, error } = await supabaseServer
+    .from(TABLES.SOURCES)
+    .select('*')
+    .eq('workspaceId', workspaceId)
+    .order('createdAt', { ascending: false });
+
+  if (error || !data) return [];
+  return data.map(mapSource);
 }
 
 export async function findSourceByInputHash(
@@ -66,13 +89,16 @@ export async function findSourceByInputHash(
   userId: string
 ): Promise<Source | null> {
   try {
-    const result = await serverDatabases.listDocuments(DB_ID, COLLECTIONS.SOURCES, [
-      Query.equal('inputHash', inputHash),
-      Query.equal('userId', userId),
-      Query.limit(1),
-    ]);
-    const doc = result.documents[0];
-    return doc ? ({ ...doc, sourceType: (doc as any).type } as unknown as Source) : null;
+    const { data, error } = await supabaseServer
+      .from(TABLES.SOURCES)
+      .select('*')
+      .eq('inputHash', inputHash)
+      .eq('userId', userId)
+      .limit(1)
+      .maybeSingle();
+
+    if (error || !data) return null;
+    return mapSource(data);
   } catch {
     return null;
   }
@@ -83,17 +109,31 @@ export async function updateSourceStatus(
   status: SourceStatus,
   rawTextPath?: string
 ): Promise<Source> {
-  const data: Record<string, unknown> = { status };
-  if (rawTextPath) data.rawTextPath = rawTextPath;
-  const doc = await serverDatabases.updateDocument(DB_ID, COLLECTIONS.SOURCES, sourceId, data);
-  return { ...doc, sourceType: (doc as any).type } as unknown as Source;
+  const updatePayload: Record<string, unknown> = { status };
+  if (rawTextPath) updatePayload.rawTextPath = rawTextPath;
+
+  const { data, error } = await supabaseServer
+    .from(TABLES.SOURCES)
+    .update(updatePayload)
+    .eq('id', sourceId)
+    .select()
+    .single();
+
+  if (error) throw new Error(`Failed to update source status: ${error.message}`);
+  return mapSource(data);
 }
 
 export async function updateSourceMetadata(
   sourceId: string,
   metadataStr: string
 ): Promise<Source> {
-  const doc = await serverDatabases.updateDocument(DB_ID, COLLECTIONS.SOURCES, sourceId, { metadata: metadataStr });
-  return { ...doc, sourceType: (doc as any).type } as unknown as Source;
-}
+  const { data, error } = await supabaseServer
+    .from(TABLES.SOURCES)
+    .update({ metadata: metadataStr })
+    .eq('id', sourceId)
+    .select()
+    .single();
 
+  if (error) throw new Error(`Failed to update source metadata: ${error.message}`);
+  return mapSource(data);
+}

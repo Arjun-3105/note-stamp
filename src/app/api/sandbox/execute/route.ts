@@ -3,7 +3,7 @@ import { auth } from '@clerk/nextjs/server';
 import { createTrace } from '@/lib/db/sandbox';
 import { type TraceFrame, type TestResult } from '@/lib/db/sandbox';
 import { z } from 'zod';
-import { ID } from 'node-appwrite';
+import { verifySourceAccess } from '@/lib/auth/workspace';
 
 const RequestSchema = z.object({
   code: z.string().min(1),
@@ -42,7 +42,17 @@ export async function POST(req: NextRequest) {
     const body = await req.json();
     const parsed = RequestSchema.parse(body);
 
-    const submissionId = ID.unique();
+    const submissionId = crypto.randomUUID();
+
+    // Verify source access if sourceId provided
+    if (parsed.sourceId) {
+      try {
+        await verifySourceAccess(parsed.sourceId, userId);
+      } catch (err) {
+        const errorMessage = err instanceof Error ? err.message : 'Access denied';
+        return NextResponse.json({ error: errorMessage }, { status: 403 });
+      }
+    }
 
     await createTrace({
       submissionId,

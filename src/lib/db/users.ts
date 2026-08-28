@@ -1,5 +1,4 @@
-import { ID, Query } from 'node-appwrite';
-import { serverDatabases, DB_ID, COLLECTIONS } from '@/lib/appwrite-server';
+import { supabaseServer, TABLES, mapDoc } from '@/lib/supabase-server';
 
 export interface User {
   $id: string;
@@ -20,22 +19,32 @@ export interface CreateUserInput {
 }
 
 export async function createUser(data: CreateUserInput): Promise<User> {
-  return serverDatabases.createDocument(DB_ID, COLLECTIONS.USERS, ID.unique(), {
-    userId: data.userId,
-    email: data.email,
-    plan: data.plan || 'free',
-    wallet: data.wallet || null,
-    createdAt: new Date().toISOString(),
-  }) as unknown as User;
+  const { data: doc, error } = await supabaseServer
+    .from(TABLES.USERS)
+    .insert({
+      userId: data.userId,
+      email: data.email,
+      plan: data.plan || 'free',
+      wallet: data.wallet || null,
+      createdAt: new Date().toISOString(),
+    })
+    .select()
+    .single();
+
+  if (error) throw new Error(`Failed to create user: ${error.message}`);
+  return mapDoc<User>(doc);
 }
 
 export async function getUser(userId: string): Promise<User | null> {
   try {
-    const result = await serverDatabases.listDocuments(DB_ID, COLLECTIONS.USERS, [
-      Query.equal('userId', userId),
-      Query.limit(1),
-    ]);
-    return (result.documents[0] as unknown as User) || null;
+    const { data, error } = await supabaseServer
+      .from(TABLES.USERS)
+      .select('*')
+      .eq('userId', userId)
+      .maybeSingle();
+
+    if (error || !data) return null;
+    return mapDoc<User>(data);
   } catch {
     return null;
   }
@@ -45,12 +54,17 @@ export async function updateUser(userId: string, data: Partial<User>): Promise<U
   const user = await getUser(userId);
   if (!user) throw new Error('User not found');
 
-  return serverDatabases.updateDocument(
-    DB_ID,
-    COLLECTIONS.USERS,
-    user.$id,
-    data
-  ) as unknown as User;
+  const { $id, ...updatePayload } = data;
+
+  const { data: doc, error } = await supabaseServer
+    .from(TABLES.USERS)
+    .update(updatePayload)
+    .eq('id', user.$id)
+    .select()
+    .single();
+
+  if (error) throw new Error(`Failed to update user: ${error.message}`);
+  return mapDoc<User>(doc);
 }
 
 export async function updateUserPlan(
@@ -65,4 +79,3 @@ export async function updateUserPlan(
 export async function updateUserWallet(userId: string, wallet: string): Promise<User> {
   return updateUser(userId, { wallet });
 }
-

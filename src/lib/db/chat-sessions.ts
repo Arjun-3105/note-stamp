@@ -1,5 +1,4 @@
-import { ID, Query } from 'node-appwrite';
-import { serverDatabases, DB_ID, COLLECTIONS } from '@/lib/appwrite-server';
+import { supabaseServer, TABLES, mapDoc } from '@/lib/supabase-server';
 
 export type ContextType = 'source' | 'quiz' | 'roadmap' | 'problem';
 export type AssistantMode = 'teacher' | 'corrector' | 'quiz_hint' | 'roadmap_guide' | 'problem_solver';
@@ -35,26 +34,36 @@ export interface CreateChatSessionInput {
 
 export async function createChatSession(data: CreateChatSessionInput): Promise<ChatSession> {
   const now = new Date().toISOString();
-  return serverDatabases.createDocument(DB_ID, COLLECTIONS.CHAT_SESSIONS, ID.unique(), {
-    userId: data.userId,
-    contextType: data.contextType,
-    contextId: data.contextId,
-    messages: JSON.stringify([]),
-    mode: data.mode,
-    inputType: 'text',
-    summary: null,
-    createdAt: now,
-    updatedAt: now,
-  }) as unknown as ChatSession;
+  const { data: doc, error } = await supabaseServer
+    .from(TABLES.CHAT_SESSIONS)
+    .insert({
+      userId: data.userId,
+      contextType: data.contextType,
+      contextId: data.contextId,
+      messages: JSON.stringify([]),
+      mode: data.mode,
+      inputType: 'text',
+      summary: null,
+      createdAt: now,
+      updatedAt: now,
+    })
+    .select()
+    .single();
+
+  if (error) throw new Error(`Failed to create chat session: ${error.message}`);
+  return mapDoc<ChatSession>(doc);
 }
 
 export async function getChatSession(sessionId: string): Promise<ChatSession | null> {
   try {
-    return await serverDatabases.getDocument(
-      DB_ID,
-      COLLECTIONS.CHAT_SESSIONS,
-      sessionId
-    ) as unknown as ChatSession;
+    const { data, error } = await supabaseServer
+      .from(TABLES.CHAT_SESSIONS)
+      .select('*')
+      .eq('id', sessionId)
+      .maybeSingle();
+
+    if (error || !data) return null;
+    return mapDoc<ChatSession>(data);
   } catch {
     return null;
   }
@@ -67,15 +76,18 @@ export async function findOrCreateChatSession(
   mode: AssistantMode
 ): Promise<ChatSession> {
   try {
-    const result = await serverDatabases.listDocuments(DB_ID, COLLECTIONS.CHAT_SESSIONS, [
-      Query.equal('userId', userId),
-      Query.equal('contextType', contextType),
-      Query.equal('contextId', contextId),
-      Query.equal('mode', mode),
-      Query.limit(1),
-    ]);
-    if (result.documents.length > 0) {
-      return result.documents[0] as unknown as ChatSession;
+    const { data, error } = await supabaseServer
+      .from(TABLES.CHAT_SESSIONS)
+      .select('*')
+      .eq('userId', userId)
+      .eq('contextType', contextType)
+      .eq('contextId', contextId)
+      .eq('mode', mode)
+      .limit(1)
+      .maybeSingle();
+
+    if (!error && data) {
+      return mapDoc<ChatSession>(data);
     }
   } catch {
     // fall through to create
@@ -110,7 +122,6 @@ export async function addMessage(
     summary = `Previous ${oldMessages.length} messages covering ${mode} mode discussion.`;
   }
 
-  // Ensure the stringified messages don't exceed Appwrite's 50,000 character limit
   let msgsToSave = messages.slice(-50);
   let stringified = JSON.stringify(msgsToSave);
   while (stringified.length >= 48000 && msgsToSave.length > 2) {
@@ -118,29 +129,52 @@ export async function addMessage(
     stringified = JSON.stringify(msgsToSave);
   }
 
-  return serverDatabases.updateDocument(DB_ID, COLLECTIONS.CHAT_SESSIONS, sessionId, {
-    messages: stringified,
-    inputType,
-    updatedAt: now,
-    ...(summary && { summary }),
-  }) as unknown as ChatSession;
+  const { data: doc, error } = await supabaseServer
+    .from(TABLES.CHAT_SESSIONS)
+    .update({
+      messages: stringified,
+      inputType,
+      updatedAt: now,
+      ...(summary && { summary }),
+    })
+    .eq('id', sessionId)
+    .select()
+    .single();
+
+  if (error) throw new Error(`Failed to update chat session messages: ${error.message}`);
+  return mapDoc<ChatSession>(doc);
 }
 
 export async function updateChatSessionMode(
   sessionId: string,
   mode: AssistantMode
 ): Promise<ChatSession> {
-  return serverDatabases.updateDocument(DB_ID, COLLECTIONS.CHAT_SESSIONS, sessionId, {
-    mode,
-    updatedAt: new Date().toISOString(),
-  }) as unknown as ChatSession;
+  const { data: doc, error } = await supabaseServer
+    .from(TABLES.CHAT_SESSIONS)
+    .update({
+      mode,
+      updatedAt: new Date().toISOString(),
+    })
+    .eq('id', sessionId)
+    .select()
+    .single();
+
+  if (error) throw new Error(`Failed to update chat session mode: ${error.message}`);
+  return mapDoc<ChatSession>(doc);
 }
 
 export async function clearChatSessionMessages(sessionId: string): Promise<ChatSession> {
-  return serverDatabases.updateDocument(DB_ID, COLLECTIONS.CHAT_SESSIONS, sessionId, {
-    messages: JSON.stringify([]),
-    summary: null,
-    updatedAt: new Date().toISOString(),
-  }) as unknown as ChatSession;
-}
+  const { data: doc, error } = await supabaseServer
+    .from(TABLES.CHAT_SESSIONS)
+    .update({
+      messages: JSON.stringify([]),
+      summary: null,
+      updatedAt: new Date().toISOString(),
+    })
+    .eq('id', sessionId)
+    .select()
+    .single();
 
+  if (error) throw new Error(`Failed to clear chat session messages: ${error.message}`);
+  return mapDoc<ChatSession>(doc);
+}

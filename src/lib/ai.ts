@@ -4,7 +4,7 @@
  */
 
 export const MODELS = {
-  budget: process.env.OPENROUTER_MODEL_BUDGET || 'google/gemini-2.5-flash-lite',
+  budget: process.env.OPENROUTER_MODEL_BUDGET || process.env.GEMINI_MODEL || 'google/gemini-3.1-flash-lite',
   fast: process.env.OPENROUTER_MODEL_FAST || 'deepseek/deepseek-v4-flash',
   mid: process.env.OPENROUTER_MODEL_MID || 'anthropic/claude-haiku-4-5',
   smart: process.env.OPENROUTER_MODEL_SMART || 'anthropic/claude-sonnet-4-6',
@@ -33,6 +33,17 @@ interface AICallOptions {
   maxTokens?: number;
   temperature?: number;
   tier?: ModelTier;
+  tools?: Tool[];
+  toolChoice?: 'auto' | 'none' | { type: 'function'; function: { name: string } };
+}
+
+export interface Tool {
+  type: 'function';
+  function: {
+    name: string;
+    description: string;
+    parameters: Record<string, unknown>;
+  };
 }
 
 interface AIResponse {
@@ -55,6 +66,7 @@ export async function callAI(options: AICallOptions): Promise<AIResponse> {
     temperature: options.temperature ?? 0.7,
     max_tokens: options.maxTokens ?? 1024,
     ...(options.jsonMode && { response_format: { type: 'json_object' } }),
+    ...(options.tools && { tools: options.tools, tool_choice: options.toolChoice || 'auto' }),
   };
 
   let response = await fetch(OPENROUTER_URL, {
@@ -116,6 +128,7 @@ export async function callAIStreaming(
       temperature: options.temperature ?? 0.7,
       max_tokens: options.maxTokens ?? 1024,
       stream: true,
+      ...(options.tools && { tools: options.tools, tool_choice: options.toolChoice || 'auto' }),
     }),
   });
 
@@ -182,7 +195,8 @@ async function callGeminiFallback(options: AICallOptions): Promise<AIResponse> {
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) throw new Error('GEMINI_API_KEY is not configured for fallback');
   
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`;
+  const geminiModel = process.env.GEMINI_MODEL || 'gemini-3.1-flash-lite';
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/${geminiModel}:generateContent?key=${apiKey}`;
   
   const body = {
     systemInstruction: { parts: [{ text: options.systemPrompt }] },
@@ -211,7 +225,7 @@ async function callGeminiFallback(options: AICallOptions): Promise<AIResponse> {
 
   return {
     content,
-    model: 'gemini-2.5-flash (fallback)',
+    model: `${geminiModel} (fallback)`,
     inputTokens: usage.promptTokenCount || 0,
     outputTokens: usage.candidatesTokenCount || 0,
     cached: false
@@ -225,7 +239,8 @@ async function callGeminiStreamingFallback(
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) throw new Error('GEMINI_API_KEY is not configured for fallback');
   
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:streamGenerateContent?alt=sse&key=${apiKey}`;
+  const geminiModel = process.env.GEMINI_MODEL || 'gemini-3.1-flash-lite';
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/${geminiModel}:streamGenerateContent?alt=sse&key=${apiKey}`;
   
   const body = {
     systemInstruction: { parts: [{ text: options.systemPrompt }] },
@@ -286,7 +301,7 @@ async function callGeminiStreamingFallback(
 
   return { 
     content: fullContent, 
-    model: 'gemini-2.5-flash (fallback)', 
+    model: `${geminiModel} (fallback)`, 
     inputTokens, 
     outputTokens, 
     cached: false 

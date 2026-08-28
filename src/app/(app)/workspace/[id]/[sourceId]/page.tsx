@@ -12,6 +12,10 @@ import { AssistantPanel } from '@/components/assistant/AssistantPanel';
 import type { FocusTopic } from '@/components/assistant/AssistantPanel';
 import { TopicRoadmap } from '@/components/learn/TopicRoadmap';
 import type { RoadmapNode, RoadmapEdge } from '@/components/learn/TopicRoadmap';
+import { FlashcardsView } from '@/components/learn/FlashcardsView';
+import { QuizView } from '@/components/learn/QuizView';
+import { PracticeView } from '@/components/learn/PracticeView';
+import { useProgress } from '@/hooks/useProgress';
 
 const BlockNoteEditor = dynamic(
   () => import('@/components/editor/BlockNoteEditor').then(m => m.BlockNoteEditor),
@@ -74,6 +78,38 @@ export default function SourceDetailPage({
   const [roadmapLoading, setRoadmapLoading] = useState(false);
   const [roadmapOpen, setRoadmapOpen] = useState(false);
   const [isDetailedRoadmap, setIsDetailedRoadmap] = useState(false);
+
+  // Progress tracking (chunks/pages/topics)
+  const { completedTopics, toggleTopic, setTotals: setProgressTotals, progress: progState, stats: progStats } = useProgress(sourceId, id);
+  const [overallProgress, setOverallProgress] = useState<{doneChunks:number,totalChunks:number,donePages:number,totalPages:number}>({doneChunks:0,totalChunks:0,donePages:0,totalPages:0});
+
+  // sync totalTopics when roadmap loads
+  useEffect(() => {
+    if (roadmapNodes.length) setProgressTotals({ totalTopics: roadmapNodes.length });
+  }, [roadmapNodes, setProgressTotals]);
+
+  // poll overall chunk/page progress (from same sourceId file, shared with SourceViewer)
+  useEffect(() => {
+    let cancelled = false;
+    const load = async () => {
+      try {
+        const res = await fetch(`/api/progress?sourceId=${encodeURIComponent(sourceId)}`);
+        if (!res.ok) return;
+        const data = await res.json();
+        if (!cancelled && data.progress) {
+          setOverallProgress({
+            doneChunks: (data.progress.completedChunks||[]).length,
+            totalChunks: data.progress.totalChunks || 0,
+            donePages: (data.progress.completedPages||[]).length,
+            totalPages: data.progress.totalPages || 0,
+          });
+        }
+      } catch {}
+    };
+    load();
+    const id2 = setInterval(load, 2000);
+    return () => { cancelled = true; clearInterval(id2); };
+  }, [sourceId]);
 
   // Load source + workspace + notes
   useEffect(() => {
@@ -261,7 +297,7 @@ export default function SourceDetailPage({
       <PanelGroup direction="horizontal" className="flex flex-1 overflow-hidden">
         {/* Left: Source Viewer */}
         <Panel ref={sourcePanelRef} collapsible defaultSize={38} minSize={20} onCollapse={() => setSourceOpen(false)} onExpand={() => setSourceOpen(true)} className="flex flex-col bg-black">
-          <SourceViewer sourceType={source.sourceType} url={source.url} title={source.title} />
+          <SourceViewer sourceId={source.$id} workspaceId={id} sourceType={source.sourceType} url={source.url} title={source.title} />
         </Panel>
         <PanelResizeHandle className="w-1 bg-[#252B36] hover:bg-[#7C5CFF] transition-colors cursor-col-resize" />
 
@@ -276,7 +312,7 @@ export default function SourceDetailPage({
             
             {/* Navigation Tabs */}
             <div className="flex items-center gap-1 border-b border-[#252B36] pb-3 flex-wrap">
-              {['Learn', 'Notes', 'Mind Map', 'Flashcards', 'Quiz', 'Practice', 'Sandbox', 'Math'].map(tab => (
+              {['Learn', 'Notes', 'Flashcards', 'Quiz', 'Practice', 'Sandbox', 'Math'].map(tab => (
                 <button
                   key={tab}
                   onClick={() => setActiveTab(tab)}
@@ -294,6 +330,36 @@ export default function SourceDetailPage({
 
           {/* Central Workspace Content */}
           <div className="flex-1 overflow-y-auto px-8 pb-8">
+            {/* Overall progress summary — chunks / pages / topics */}
+            {(overallProgress.totalChunks > 0 || overallProgress.totalPages > 0 || roadmapNodes.length > 0) && (
+              <div className="mb-4 rounded-[14px] bg-[#151922] border border-[#252B36] p-3 flex flex-wrap items-center gap-3">
+                <span className="text-[11px] font-extrabold uppercase tracking-widest text-[#7C5CFF]">Progress</span>
+                {overallProgress.totalChunks > 0 && (
+                  <span className="text-xs font-bold px-2.5 py-1 rounded-full bg-[#0F1115] border border-[#252B36] text-[#A2A8B5]">Chunks {overallProgress.doneChunks}/{overallProgress.totalChunks}</span>
+                )}
+                {overallProgress.totalPages > 0 && (
+                  <span className="text-xs font-bold px-2.5 py-1 rounded-full bg-[#0F1115] border border-[#252B36] text-[#A2A8B5]">Pages {overallProgress.donePages}/{overallProgress.totalPages}</span>
+                )}
+                {roadmapNodes.length > 0 && (
+                  <span className={`text-xs font-bold px-2.5 py-1 rounded-full border ${completedTopics.length >= roadmapNodes.length ? 'bg-[#42C67A]/15 border-[#42C67A]/30 text-[#42C67A]' : 'bg-[#0F1115] border-[#252B36] text-[#A2A8B5]'}`}>Topics {completedTopics.length}/{roadmapNodes.length} {completedTopics.length >= roadmapNodes.length ? '✓' : ''}</span>
+                )}
+                <div className="flex-1 min-w-[80px] h-1.5 rounded-full bg-[#0F1115] border border-[#252B36] overflow-hidden">
+                  <div className="h-full bg-[#42C67A] transition-all" style={{ width: `${(() => {
+                    const total = (overallProgress.totalChunks>0?1:0)+(overallProgress.totalPages>0?1:0)+(roadmapNodes.length>0?1:0);
+                    if (!total) return 0;
+                    const pctChunks = overallProgress.totalChunks ? (overallProgress.doneChunks/overallProgress.totalChunks)*100 : 0;
+                    const pctPages = overallProgress.totalPages ? (overallProgress.donePages/overallProgress.totalPages)*100 : 0;
+                    const pctTopics = roadmapNodes.length ? (completedTopics.length/roadmapNodes.length)*100 : 0;
+                    let sum = 0; let cnt=0;
+                    if (overallProgress.totalChunks) { sum+=pctChunks; cnt++; }
+                    if (overallProgress.totalPages) { sum+=pctPages; cnt++; }
+                    if (roadmapNodes.length) { sum+=pctTopics; cnt++; }
+                    return Math.round(sum/(cnt||1));
+                  })()}%` }} />
+                </div>
+                <span className="text-[11px] text-[#6b7280] hidden sm:inline">{roadmapNodes.length ? `${progStats.topicsPct}% topics` : ''} • left: source panel + roadmap checks</span>
+              </div>
+            )}
             
             {/* Dynamic Roadmap Layer (Only rendered when actual concepts are present) */}
             {(roadmapLoading || roadmapNodes.length > 0) && (
@@ -326,6 +392,8 @@ export default function SourceDetailPage({
                     onSelectNode={handleSelectTopic}
                     isOpen={roadmapOpen}
                     onToggle={() => setRoadmapOpen(o => !o)}
+                    completedTopics={completedTopics}
+                    onToggleTopic={toggleTopic}
                   />
                 )}
               </div>
@@ -426,8 +494,11 @@ export default function SourceDetailPage({
               </div>
             )}
 
-            {/* Other tabs fallback */}
-            {!['Learn', 'Notes', 'Sandbox', 'Math'].includes(activeTab) && (
+            {activeTab === 'Flashcards' && <FlashcardsView sourceId={source.$id} />}
+            {activeTab === 'Quiz' && <QuizView sourceId={source.$id} workspaceId={id} />}
+            {activeTab === 'Practice' && <PracticeView sourceId={source.$id} />}
+
+            {!['Learn', 'Notes', 'Sandbox', 'Math', 'Flashcards', 'Quiz', 'Practice'].includes(activeTab) && (
               <div className="bg-[#151922] rounded-[20px] p-12 text-center border border-[#252B36] shadow-sm space-y-3 max-w-md mx-auto mt-8">
                 <div className="text-3xl">✦</div>
                 <h3 className="text-base font-bold text-[#F5F6F8]">{activeTab}</h3>
@@ -463,7 +534,6 @@ export default function SourceDetailPage({
             <Panel ref={aiPanelRef} collapsible defaultSize={25} minSize={15} onCollapse={() => setAiOpen(false)} onExpand={() => setAiOpen(true)} className="flex flex-col bg-[#151922]">
               <AssistantPanel
                 sourceId={source.$id}
-                title="Teacher Mode"
                 initialMode="teacher"
                 focusTopic={selectedTopic}
               />

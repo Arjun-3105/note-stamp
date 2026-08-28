@@ -1,5 +1,4 @@
 import pdf from 'pdf-parse';
-import { Storage } from 'appwrite';
 
 /**
  * Parse uploaded PDF file to extract text
@@ -25,22 +24,14 @@ export async function analyzeImage(imageBuffer: Buffer, format: string): Promise
 }
 
 /**
- * Store uploaded file in Appwrite Storage
+ * Store uploaded file
  */
 export async function storeUploadedFile(
   fileBuffer: Buffer,
   fileName: string,
   userId: string
 ): Promise<string> {
-  const storage = new Storage(
-    new (await import('appwrite')).Client()
-      .setEndpoint(process.env.NEXT_PUBLIC_APPWRITE_ENDPOINT || '')
-      .setProject(process.env.NEXT_PUBLIC_APPWRITE_PROJECT_ID || '')
-  );
-
   try {
-    // Note: In production, use Appwrite Admin SDK with API key
-    // For now, this is a placeholder
     const fileId = `${userId}-${Date.now()}-${fileName}`;
     console.log('Would store file:', fileId);
     return fileId;

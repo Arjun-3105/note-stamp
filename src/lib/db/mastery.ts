@@ -1,5 +1,4 @@
-import { ID, Query } from 'node-appwrite';
-import { serverDatabases, DB_ID, COLLECTIONS } from '@/lib/appwrite-server';
+import { supabaseServer, TABLES, mapDoc } from '@/lib/supabase-server';
 
 export type MasterySource = 'quiz' | 'sandbox_trace' | 'step_verification';
 
@@ -32,47 +31,70 @@ export async function upsertMastery(data: UpsertMasteryInput): Promise<ConceptMa
   const existing = await getMastery(data.studentId, data.conceptId);
 
   if (existing?.$id) {
-    const doc = await serverDatabases.updateDocument(
-      DB_ID, COLLECTIONS.CONCEPT_MASTERY, existing.$id,
-      {
+    const { data: doc, error } = await supabaseServer
+      .from(TABLES.CONCEPT_MASTERY)
+      .update({
         masteryScore: data.masteryScore,
         stability: data.stability,
         lastReviewed: now,
         sourceOfMastery: data.sourceOfMastery,
-      }
-    );
-    return doc as unknown as ConceptMastery;
+      })
+      .eq('id', existing.$id)
+      .select()
+      .single();
+
+    if (error) throw new Error(`Failed to update concept mastery: ${error.message}`);
+    return mapDoc<ConceptMastery>(doc);
   }
 
-  return serverDatabases.createDocument(DB_ID, COLLECTIONS.CONCEPT_MASTERY, ID.unique(), {
-    studentId: data.studentId,
-    conceptId: data.conceptId,
-    workspaceId: data.workspaceId,
-    masteryScore: data.masteryScore,
-    stability: data.stability,
-    lastReviewed: now,
-    sourceOfMastery: data.sourceOfMastery,
-  }) as unknown as ConceptMastery;
+  const { data: doc, error } = await supabaseServer
+    .from(TABLES.CONCEPT_MASTERY)
+    .insert({
+      studentId: data.studentId,
+      conceptId: data.conceptId,
+      workspaceId: data.workspaceId,
+      masteryScore: data.masteryScore,
+      stability: data.stability,
+      lastReviewed: now,
+      sourceOfMastery: data.sourceOfMastery,
+    })
+    .select()
+    .single();
+
+  if (error) throw new Error(`Failed to create concept mastery: ${error.message}`);
+  return mapDoc<ConceptMastery>(doc);
 }
 
 export async function getMastery(studentId: string, conceptId: string): Promise<ConceptMastery | null> {
   try {
-    const result = await serverDatabases.listDocuments(DB_ID, COLLECTIONS.CONCEPT_MASTERY, [
-      Query.equal('studentId', studentId),
-      Query.equal('conceptId', conceptId),
-      Query.limit(1),
-    ]);
-    return (result.documents[0] as unknown as ConceptMastery) ?? null;
+    const { data, error } = await supabaseServer
+      .from(TABLES.CONCEPT_MASTERY)
+      .select('*')
+      .eq('studentId', studentId)
+      .eq('conceptId', conceptId)
+      .maybeSingle();
+
+    if (error || !data) return null;
+    return mapDoc<ConceptMastery>(data);
   } catch {
     return null;
   }
 }
 
 export async function listMasteryForStudent(studentId: string, workspaceId?: string): Promise<ConceptMastery[]> {
-  const queries = [Query.equal('studentId', studentId), Query.limit(200)];
-  if (workspaceId) queries.push(Query.equal('workspaceId', workspaceId));
-  const result = await serverDatabases.listDocuments(DB_ID, COLLECTIONS.CONCEPT_MASTERY, queries);
-  return result.documents as unknown as ConceptMastery[];
+  let query = supabaseServer
+    .from(TABLES.CONCEPT_MASTERY)
+    .select('*')
+    .eq('studentId', studentId);
+
+  if (workspaceId) {
+    query = query.eq('workspaceId', workspaceId);
+  }
+
+  const { data, error } = await query.limit(200);
+
+  if (error || !data) return [];
+  return mapDoc<ConceptMastery[]>(data);
 }
 
 /**

@@ -2,9 +2,10 @@ import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@clerk/nextjs/server';
 import { createSource, updateSourceStatus } from '@/lib/db/sources';
 import { calculateInputHash, normalizeText, extractMetadata, isEducationalContent } from '@/lib/ingestion/helpers';
+import { extractUrlContent } from '@/lib/ingestion/url-extract';
 import { z } from 'zod';
-import { JSDOM } from 'jsdom';
-import { Readability } from '@mozilla/readability';
+import { saveLocalTranscript } from '@/lib/local-db';
+import { chunkSections, saveSourceChunks } from '@/lib/source-chunks';
 
 const RequestSchema = z.object({
   url: z.string(),
@@ -13,7 +14,7 @@ const RequestSchema = z.object({
 
 /**
  * POST /api/ingest/url
- * Scrape and extract content from URL
+ * Extract article content from URL (Readability first, ScrapeGraphAI fallback when needed)
  */
 export async function POST(req: NextRequest) {
   try {
@@ -23,81 +24,20 @@ export async function POST(req: NextRequest) {
     }
 
     const body = await req.json();
-    let { url, workspaceId } = RequestSchema.parse(body);
+    const { url, workspaceId } = RequestSchema.parse(body);
 
-    if (!url.startsWith('http://') && !url.startsWith('https://')) {
-      url = `https://${url}`;
-    }
-
-    // Fetch URL content
-    let htmlContent: string;
-    let title: string;
-    let fetchedUrl: string;
-
+    let extracted;
     try {
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 15000);
-      const response = await fetch(url, {
-        headers: {
-          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-        },
-        signal: controller.signal,
-      });
-      clearTimeout(timeoutId);
-
-      if (!response.ok) {
-        return NextResponse.json(
-          { error: `Failed to fetch URL: ${response.statusText}` },
-          { status: 400 }
-        );
-      }
-
-      htmlContent = await response.text();
-      fetchedUrl = response.url;
-
-      // Check content type
-      const contentType = response.headers.get('content-type') || '';
-      if (!contentType.includes('text/html') && !contentType.includes('text/plain')) {
-        return NextResponse.json(
-          { error: 'URL must return HTML or text content' },
-          { status: 400 }
-        );
-      }
+      extracted = await extractUrlContent(url);
     } catch (error) {
       return NextResponse.json(
-        { error: `Failed to fetch URL: ${error}` },
+        { error: error instanceof Error ? error.message : 'Failed to fetch URL content' },
         { status: 400 }
       );
     }
 
-    // Parse HTML and extract readable content
-    let extractedText: string = '';
-    try {
-      const dom = new JSDOM(htmlContent, { url: fetchedUrl });
-      const readability = new Readability(dom.window.document);
-      const article = readability.parse();
+    const normalizedText = normalizeText(extracted.transcript);
 
-      if (!article) {
-        return NextResponse.json(
-          { error: 'Could not extract readable content from URL' },
-          { status: 400 }
-        );
-      }
-
-      title = article.title || new URL(url).hostname;
-      // Convert HTML to plain text
-      extractedText = article.textContent || '';
-    } catch (error) {
-      console.error('Readability error:', error);
-      return NextResponse.json(
-        { error: 'Failed to parse HTML content' },
-        { status: 400 }
-      );
-    }
-
-    const normalizedText = normalizeText(extractedText);
-
-    // Check if educational
     if (!isEducationalContent(normalizedText)) {
       return NextResponse.json(
         {
@@ -108,36 +48,41 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Calculate hash
     const inputHash = calculateInputHash(normalizedText);
-
-    // Extract metadata
     const metadata = {
       ...extractMetadata(normalizedText, 'url'),
-      sourceUrl: fetchedUrl,
-      domain: new URL(fetchedUrl).hostname,
+      sourceUrl: extracted.fetchedUrl,
+      domain: new URL(extracted.fetchedUrl).hostname,
+      extractor: extracted.extractor,
+      sectionCount: extracted.sections.length,
     };
 
-    // Create source
     const source = await createSource({
       workspaceId,
       userId,
       sourceType: 'url',
-      title,
-      url: fetchedUrl,
+      title: extracted.title,
+      url: extracted.fetchedUrl,
       inputHash,
       metadata,
     });
 
-    // Update status
-    await updateSourceStatus(source.$id, 'ready');
+    await saveLocalTranscript(source.$id, extracted.transcript);
+    await saveSourceChunks(
+      source.$id,
+      chunkSections(source.$id, extracted.sections, { documentTitle: extracted.title })
+    );
+
+    await updateSourceStatus(source.$id, 'ready', `data/transcripts/${source.$id}.txt`);
 
     return NextResponse.json({
       sourceId: source.$id,
-      title,
-      url: fetchedUrl,
+      title: extracted.title,
+      url: extracted.fetchedUrl,
       wordCount: metadata.wordCount,
-      textLength: normalizedText.length,
+      textLength: extracted.transcript.length,
+      extractor: extracted.extractor,
+      sectionCount: extracted.sections.length,
       message: 'URL content imported successfully',
     });
   } catch (error) {
@@ -156,4 +101,3 @@ export async function POST(req: NextRequest) {
     );
   }
 }
-

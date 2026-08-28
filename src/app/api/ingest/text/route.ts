@@ -2,7 +2,10 @@ import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@clerk/nextjs/server';
 import { createSource, updateSourceStatus } from '@/lib/db/sources';
 import { calculateInputHash, normalizeText, extractMetadata, isEducationalContent } from '@/lib/ingestion/helpers';
+import { extractSectionsFromPlainText, flattenSections, normalizeStructuredText } from '@/lib/ingestion/structured-text';
 import { z } from 'zod';
+import { saveLocalTranscript } from '@/lib/local-db';
+import { chunkSections, saveSourceChunks } from '@/lib/source-chunks';
 
 const RequestSchema = z.object({
   title: z.string().min(1),
@@ -24,9 +27,9 @@ export async function POST(req: NextRequest) {
     const body = await req.json();
     const { title, text, workspaceId } = RequestSchema.parse(body);
 
-    const normalizedText = normalizeText(text);
+    const structuredText = normalizeStructuredText(text);
+    const normalizedText = normalizeText(structuredText);
 
-    // Validate minimum content
     if (normalizedText.length < 50) {
       return NextResponse.json(
         { error: 'Text must be at least 50 characters' },
@@ -34,7 +37,6 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Check if educational
     if (!isEducationalContent(normalizedText)) {
       return NextResponse.json(
         {
@@ -45,16 +47,15 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Calculate hash for deduplication
     const inputHash = calculateInputHash(normalizedText);
-
-    // Extract metadata
+    const sections = extractSectionsFromPlainText(structuredText, title);
+    const transcript = flattenSections(sections);
     const metadata = {
       ...extractMetadata(normalizedText, 'text'),
       sourceType: 'manual',
+      sectionCount: sections.length,
     };
 
-    // Create source
     const source = await createSource({
       workspaceId,
       userId,
@@ -64,14 +65,17 @@ export async function POST(req: NextRequest) {
       metadata,
     });
 
-    // Update status
-    await updateSourceStatus(source.$id, 'ready');
+    await saveLocalTranscript(source.$id, transcript);
+    await saveSourceChunks(source.$id, chunkSections(source.$id, sections, { documentTitle: title }));
+
+    await updateSourceStatus(source.$id, 'ready', `data/transcripts/${source.$id}.txt`);
 
     return NextResponse.json({
       sourceId: source.$id,
       title,
       wordCount: metadata.wordCount,
-      textLength: normalizedText.length,
+      textLength: transcript.length,
+      sectionCount: sections.length,
       message: 'Text content added to workspace',
     });
   } catch (error) {
@@ -90,4 +94,3 @@ export async function POST(req: NextRequest) {
     );
   }
 }
-

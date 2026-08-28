@@ -26,12 +26,11 @@ export default function ProfilePage() {
             appearance={{
               variables: {
                 colorBackground: '#0f172a', // slate-900
-                colorInputBackground: '#1e293b', // slate-800
                 colorText: '#f8fafc', // slate-50
                 colorTextSecondary: '#94a3b8', // slate-400
                 colorPrimary: '#6366f1', // indigo-500
                 colorDanger: '#ef4444', // red-500
-              },
+              } as any,
               elements: {
                 rootBox: 'w-full',
                 card: 'shadow-none w-full border border-white/[0.08] bg-slate-900/50 backdrop-blur-md rounded-2xl',

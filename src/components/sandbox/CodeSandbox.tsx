@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useCallback, useRef } from 'react';
+import { useState, useCallback, useRef, useEffect } from 'react';
 import Editor from '@monaco-editor/react';
 import { TraceVisualizer } from './TraceVisualizer';
 import type { TraceFrame, TestResult } from '@/lib/db/sandbox';
@@ -77,6 +77,9 @@ export function CodeSandbox({ sourceId, starterCode }: CodeSandboxProps) {
   const [pyodideReady, setPyodideReady] = useState(false);
   const [pyodideLoading, setPyodideLoading] = useState(false);
   const pyodideRef = useRef<any>(null);
+  const editorRef = useRef<any>(null);
+  const monacoRef = useRef<any>(null);
+  const decorationsRef = useRef<string[]>([]);
 
   const loadPyodide = useCallback(async () => {
     if (pyodideRef.current || pyodideLoading) return;
@@ -138,7 +141,14 @@ export function CodeSandbox({ sourceId, starterCode }: CodeSandboxProps) {
       if (markerIdx !== -1) {
         displayOut = capturedOut.slice(0, markerIdx);
         try {
-          parsedFrames = JSON.parse(capturedOut.slice(markerIdx + traceMarker.length));
+          const rawFrames: TraceFrame[] = JSON.parse(capturedOut.slice(markerIdx + traceMarker.length));
+          // TRACER_PREAMBLE shifts user code by ~35 lines; adjust so editor (1..N) matches trace.
+          // instrumentedCode = TRACER_PREAMBLE + '\n' + code + '\n' + TRACER_SUFFIX
+          const preambleLineCount = TRACER_PREAMBLE.split('\n').length;
+          const codeLineCount = code.split('\n').length;
+          parsedFrames = rawFrames
+            .map(f => ({ ...f, line: (f.line as number) - preambleLineCount }))
+            .filter(f => f.line >= 1 && f.line <= codeLineCount);
         } catch {
           // ignore parse error
         }
@@ -169,6 +179,43 @@ export function CodeSandbox({ sourceId, starterCode }: CodeSandboxProps) {
     }
 
   }, [code, loadPyodide, sourceId]);
+
+  // Highlight current trace line in Monaco (syncs with slider Prev/Next)
+  useEffect(() => {
+    const editor = editorRef.current;
+    const monaco = monacoRef.current;
+    if (!editor || !monaco) return;
+    // Clear when no frames
+    if (frames.length === 0) {
+      decorationsRef.current = editor.deltaDecorations(decorationsRef.current, []);
+      return;
+    }
+    const line = frames[frameIndex]?.line;
+    if (!line) {
+      decorationsRef.current = editor.deltaDecorations(decorationsRef.current, []);
+      return;
+    }
+    decorationsRef.current = editor.deltaDecorations(decorationsRef.current, [
+      {
+        range: new monaco.Range(line, 1, line, 1),
+        options: {
+          isWholeLine: true,
+          className: 'traceLineHighlight',
+          glyphMarginClassName: 'traceGlyph',
+          overviewRuler: { color: '#7C5CFF', position: 4 },
+        },
+      },
+    ]);
+    // Keep line in view
+    editor.revealLineInCenter(line);
+  }, [frameIndex, frames]);
+
+  // Clear decorations when code is edited (avoid stale highlight)
+  useEffect(() => {
+    if (frames.length === 0 && editorRef.current) {
+      decorationsRef.current = editorRef.current.deltaDecorations(decorationsRef.current, []);
+    }
+  }, [code, frames.length]);
 
   return (
     <div style={{
@@ -219,16 +266,19 @@ export function CodeSandbox({ sourceId, starterCode }: CodeSandboxProps) {
           </div>
         </div>
         <div style={{ paddingTop: 40, height: '100%' }}>
+          <style>{`.traceLineHighlight { background: rgba(124,92,255,0.22) !important; border-left: 3px solid #7C5CFF; } .traceGlyph { background: #7C5CFF; width: 4px !important; margin-left: 3px; }`}</style>
           <Editor
             height="100%"
             defaultLanguage="python"
             value={code}
             onChange={(v) => setCode(v ?? '')}
             theme="vs-dark"
+            onMount={(editor, monaco) => { editorRef.current = editor; monacoRef.current = monaco; }}
             options={{
               minimap: { enabled: false },
               fontSize: 13,
               lineNumbers: 'on',
+              glyphMargin: true,
               padding: { top: 12 },
               scrollBeyondLastLine: false,
               fontFamily: '"Fira Code", monospace',

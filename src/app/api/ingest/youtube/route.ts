@@ -6,6 +6,7 @@ import { z } from 'zod';
 import { YoutubeTranscript } from 'youtube-transcript';
 import { saveLocalTranscript } from '@/lib/local-db';
 import { callAI } from '@/lib/ai';
+import { chunkTextByWords, saveSourceChunks } from '@/lib/source-chunks';
 
 const RequestSchema = z.object({
   videoUrl: z.string(),
@@ -174,10 +175,11 @@ ${normalizedTranscript.slice(0, 300000)}
 
     // Save full transcript locally
     await saveLocalTranscript(source.$id, normalizedTranscript);
+    await saveSourceChunks(source.$id, chunkTextByWords(source.$id, normalizedTranscript));
 
     // Store transcript to Appwrite Storage (in production)
     // For now, we'll store it as document text
-    await updateSourceStatus(source.$id, 'ready');
+    await updateSourceStatus(source.$id, 'ready', `data/transcripts/${source.$id}.txt`);
 
     return NextResponse.json({
       sourceId: source.$id,

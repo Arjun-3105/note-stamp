@@ -1,4 +1,4 @@
-import { Source, Note, QuizAttempt, parseQuizQuestions, parseQuizAnswers } from '@/lib/db';
+import { parseQuizQuestions, parseQuizAnswers } from '@/lib/db';
 import { ContextType } from '@/lib/db/chat-sessions';
 
 export interface AssistantContext {
@@ -14,11 +14,12 @@ export interface AssistantContext {
 export async function buildAssistantContext(
   contextType: ContextType,
   contextId: string,
-  studentId?: string
+  studentId?: string,
+  query?: string
 ): Promise<AssistantContext> {
   switch (contextType) {
     case 'source':
-      return buildSourceContext(contextId, studentId);
+      return buildSourceContext(contextId, studentId, query);
     case 'quiz':
       return buildQuizContext(contextId);
     case 'roadmap':
@@ -35,11 +36,12 @@ export async function buildAssistantContext(
 }
 
 
-async function buildSourceContext(sourceId: string, studentId?: string): Promise<AssistantContext> {
+async function buildSourceContext(sourceId: string, studentId?: string, query?: string): Promise<AssistantContext> {
   // Import here to avoid circular deps
   const { getSource } = await import('@/lib/db/sources');
   const { listNotesBySource } = await import('@/lib/db/notes');
   const { getLocalTranscript } = await import('@/lib/local-db');
+  const { retrieveSourceChunks, formatChunksForPrompt } = await import('@/lib/source-chunks');
 
   const source = await getSource(sourceId);
   if (!source) {
@@ -53,7 +55,8 @@ async function buildSourceContext(sourceId: string, studentId?: string): Promise
   const notes = await listNotesBySource(sourceId);
   const notesContent = notes.map(n => n.content).join('\n\n');
 
-  let sourceContent = await getLocalTranscript(sourceId);
+  const retrievedChunks = query ? await retrieveSourceChunks(sourceId, query, { limit: 10, maxChars: 60000 }) : [];
+  let sourceContent = retrievedChunks.length > 0 ? formatChunksForPrompt(retrievedChunks) : await getLocalTranscript(sourceId);
   if (!sourceContent) {
     let meta: any = {};
     try { meta = JSON.parse(source.metadata as unknown as string || '{}'); } catch {}
@@ -85,7 +88,9 @@ Type: ${source.sourceType}
 ${source.url ? `URL: ${source.url}` : ''}
 
 ## Source Content:
-${sourceContent ? sourceContent.slice(0, 300000) : '(No content available)'}
+${sourceContent ? sourceContent.slice(0, retrievedChunks.length > 0 ? 70000 : 120000) : '(No content available)'}
+
+${retrievedChunks.length > 0 ? 'When answering, ground claims in the retrieved chunks above and cite page/chunk labels when useful.' : ''}
 
 ## Student Notes:
 ${notesContent || '(No notes yet)'}${masterySummary}

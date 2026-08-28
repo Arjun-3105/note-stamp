@@ -1,5 +1,4 @@
-import { ID, Query } from 'node-appwrite';
-import { serverDatabases, DB_ID, COLLECTIONS } from '@/lib/appwrite-server';
+import { supabaseServer, TABLES, mapDoc } from '@/lib/supabase-server';
 
 export interface Flashcard {
   id?: string;
@@ -32,23 +31,33 @@ export interface CreateFlashcardSetInput {
 }
 
 export async function createFlashcardSet(data: CreateFlashcardSetInput): Promise<FlashcardSet> {
-  return serverDatabases.createDocument(DB_ID, COLLECTIONS.FLASHCARD_SETS, ID.unique(), {
-    sourceId: data.sourceId,
-    userId: data.userId,
-    cards: JSON.stringify(data.cards),
-    promptVersion: data.promptVersion,
-    model: data.model,
-    generatedAt: new Date().toISOString(),
-  }) as unknown as FlashcardSet;
+  const { data: doc, error } = await supabaseServer
+    .from(TABLES.FLASHCARD_SETS)
+    .insert({
+      sourceId: data.sourceId,
+      userId: data.userId,
+      cards: JSON.stringify(data.cards),
+      promptVersion: data.promptVersion,
+      model: data.model,
+      generatedAt: new Date().toISOString(),
+    })
+    .select()
+    .single();
+
+  if (error) throw new Error(`Failed to create flashcard set: ${error.message}`);
+  return mapDoc<FlashcardSet>(doc);
 }
 
 export async function getFlashcardSet(setId: string): Promise<FlashcardSet | null> {
   try {
-    return await serverDatabases.getDocument(
-      DB_ID,
-      COLLECTIONS.FLASHCARD_SETS,
-      setId
-    ) as unknown as FlashcardSet;
+    const { data, error } = await supabaseServer
+      .from(TABLES.FLASHCARD_SETS)
+      .select('*')
+      .eq('id', setId)
+      .maybeSingle();
+
+    if (error || !data) return null;
+    return mapDoc<FlashcardSet>(data);
   } catch {
     return null;
   }
@@ -56,12 +65,16 @@ export async function getFlashcardSet(setId: string): Promise<FlashcardSet | nul
 
 export async function getFlashcardSetBySource(sourceId: string): Promise<FlashcardSet | null> {
   try {
-    const result = await serverDatabases.listDocuments(DB_ID, COLLECTIONS.FLASHCARD_SETS, [
-      Query.equal('sourceId', sourceId),
-      Query.orderDesc('generatedAt'),
-      Query.limit(1),
-    ]);
-    return (result.documents[0] as unknown as FlashcardSet) || null;
+    const { data, error } = await supabaseServer
+      .from(TABLES.FLASHCARD_SETS)
+      .select('*')
+      .eq('sourceId', sourceId)
+      .order('generatedAt', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (error || !data) return null;
+    return mapDoc<FlashcardSet>(data);
   } catch {
     return null;
   }
@@ -76,6 +89,10 @@ export function parseFlashcards(set: FlashcardSet): Flashcard[] {
 }
 
 export async function deleteFlashcardSet(setId: string): Promise<void> {
-  await serverDatabases.deleteDocument(DB_ID, COLLECTIONS.FLASHCARD_SETS, setId);
-}
+  const { error } = await supabaseServer
+    .from(TABLES.FLASHCARD_SETS)
+    .delete()
+    .eq('id', setId);
 
+  if (error) throw new Error(`Failed to delete flashcard set: ${error.message}`);
+}

@@ -7,15 +7,20 @@ export function calculateInputHash(content: string): string {
   return createHash('sha256').update(content).digest('hex');
 }
 
+import { normalizeStructuredText } from '@/lib/ingestion/structured-text';
+
 /**
- * Clean and normalize text content
+ * Flatten text for hashing and lightweight checks.
  */
 export function normalizeText(text: string): string {
   return text
-    .replace(/\s+/g, ' ') // Collapse whitespace
-    .replace(/<[^>]*>/g, '') // Remove HTML tags
+    .replace(/\s+/g, ' ')
+    .replace(/<[^>]*>/g, '')
     .trim();
 }
+
+/** Preserve paragraph and heading structure for storage and chunking. */
+export { normalizeStructuredText };
 
 /**
  * Extract metadata from source

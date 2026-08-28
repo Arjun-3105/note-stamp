@@ -24,7 +24,7 @@ const PRO_FEATURES = [
 ];
 
 export default function BillingPage() {
-  const { plan, loading } = usePlan();
+  const { plan, isLoading: loading } = usePlan();
   const [checkoutLoading, setCheckoutLoading] = useState(false);
   const [portalLoading, setPortalLoading] = useState(false);
 

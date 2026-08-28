@@ -7,6 +7,7 @@ import { listNotesBySource } from '@/lib/db/notes';
 import { listQuizAttemptsByUser } from '@/lib/db/quizzes';
 import { getMonthlyTokenUsage } from '@/lib/db/usage';
 import { getUser } from '@/lib/db/users';
+import { listProgressByUser } from '@/lib/progress';
 
 /**
  * GET /api/dashboard
@@ -32,12 +33,28 @@ export async function GET(_req: NextRequest) {
     // ── Active workspaces (exclude archived) ──────────────────────
     const workspaces = workspacesRaw.filter(w => w.status === 'active');
 
-    // ── Pull sources for the 4 most recently-updated workspaces ──
-    // (avoids a fan-out for large accounts)
-    const recentWs = workspaces.slice(0, 4);
+    // ── Progress aggregates per workspace (backend-backed chunk/page/topic tracking) ──
+    const allProgress = await listProgressByUser(userId);
+    const progressByWs = new Map<string, {done:number,total:number}>();
+    for(const p of allProgress){
+      const ws = p.workspaceId;
+      if(!ws) continue;
+      const done = (p.completedChunks?.length||0)+(p.completedPages?.length||0)+(p.completedTopics?.length||0);
+      const total = (p.totalChunks||0)+(p.totalPages||0)+(p.totalTopics||0);
+      if(!total) continue;
+      const agg = progressByWs.get(ws) || {done:0,total:0};
+      agg.done += done; agg.total += total;
+      progressByWs.set(ws, agg);
+    }
+
+    // ── Pull sources for the 8 most recently-updated workspaces ──
+    // (avoids a fan-out for large accounts) — also fixes stale sourceCount
+    const recentWs = workspaces.slice(0, 8);
     const sourcesPerWs = await Promise.all(
       recentWs.map(ws => listSourcesByWorkspace(ws.$id))
     );
+    const sourceCountMap = new Map<string, number>();
+    sourcesPerWs.forEach((srcs,i)=> sourceCountMap.set(recentWs[i].$id, srcs.length));
 
     // Flatten sources and annotate with workspace info
     const recentSources = sourcesPerWs
@@ -156,16 +173,25 @@ export async function GET(_req: NextRequest) {
         freeLimit: 100_000,
         isPro: user?.plan === 'pro',
       },
-      workspaces: workspaces.slice(0, 8).map(w => ({
-        id: w.$id,
-        title: w.title,
-        description: w.description,
-        sourceCount: w.sourceCount,
-        completedUnits: w.completedUnits,
-        totalUnits: w.totalUnits,
-        pct: w.totalUnits > 0 ? Math.round((w.completedUnits / w.totalUnits) * 100) : 0,
-        updatedAt: w.updatedAt,
-      })),
+      workspaces: workspaces.slice(0, 8).map(w => {
+        const actualSourceCount = sourceCountMap.get(w.$id) ?? w.sourceCount;
+        const prog = progressByWs.get(w.$id);
+        const trackedPct = prog && prog.total ? Math.round((prog.done / prog.total)*100) : null;
+        // Prefer tracked progress if available, else DB totalUnits
+        const pct = trackedPct !== null ? trackedPct : (w.totalUnits > 0 ? Math.round((w.completedUnits / w.totalUnits) * 100) : 0);
+        return {
+          id: w.$id,
+          title: w.title,
+          description: w.description,
+          sourceCount: actualSourceCount,
+          completedUnits: w.completedUnits,
+          totalUnits: w.totalUnits,
+          pct,
+          trackedPct,
+          progress: prog ? { done: prog.done, total: prog.total } : null,
+          updatedAt: w.updatedAt,
+        };
+      }),
       recentSources: recentSources.map(s => ({
         id: s.$id,
         title: s.title,

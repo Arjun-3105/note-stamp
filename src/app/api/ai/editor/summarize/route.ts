@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@clerk/nextjs/server';
 import { callAI } from '@/lib/ai';
+import { verifySourceAccess } from '@/lib/auth/workspace';
 
 export async function POST(req: NextRequest) {
   try {
@@ -15,6 +16,14 @@ export async function POST(req: NextRequest) {
         { error: 'Text and sourceId required' },
         { status: 400 }
       );
+    }
+
+    // Verify user has access to this source
+    try {
+      await verifySourceAccess(sourceId, userId);
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'Access denied';
+      return NextResponse.json({ error: errorMessage }, { status: 403 });
     }
 
     const summary = await callAI({

@@ -1,5 +1,4 @@
-import { ID, Query } from 'node-appwrite';
-import { serverDatabases, DB_ID, COLLECTIONS } from '@/lib/appwrite-server';
+import { supabaseServer, TABLES, mapDoc } from '@/lib/supabase-server';
 
 export interface TraceFrame {
   line: number;
@@ -41,36 +40,57 @@ export interface CreateTraceInput {
 }
 
 export async function createTrace(data: CreateTraceInput): Promise<SandboxTrace> {
-  return serverDatabases.createDocument(DB_ID, COLLECTIONS.SANDBOX_TRACES, ID.unique(), {
-    submissionId: data.submissionId,
-    userId: data.userId,
-    sourceId: data.sourceId || null,
-    code: data.code,
-    frames: JSON.stringify(data.frames),
-    testResults: data.testResults ? JSON.stringify(data.testResults) : null,
-    stdout: data.stdout,
-    stderr: data.stderr || null,
-    createdAt: new Date().toISOString(),
-  }) as unknown as SandboxTrace;
+  const { data: doc, error } = await supabaseServer
+    .from(TABLES.SANDBOX_TRACES)
+    .insert({
+      submissionId: data.submissionId,
+      userId: data.userId,
+      sourceId: data.sourceId || null,
+      code: data.code,
+      frames: JSON.stringify(data.frames),
+      testResults: data.testResults ? JSON.stringify(data.testResults) : null,
+      stdout: data.stdout,
+      stderr: data.stderr || null,
+      createdAt: new Date().toISOString(),
+    })
+    .select()
+    .single();
+
+  if (error) throw new Error(`Failed to create trace: ${error.message}`);
+  return mapDoc<SandboxTrace>(doc);
 }
 
 export async function getTrace(submissionId: string): Promise<SandboxTrace | null> {
   try {
-    const result = await serverDatabases.listDocuments(DB_ID, COLLECTIONS.SANDBOX_TRACES, [
-      Query.equal('submissionId', submissionId),
-      Query.limit(1),
-    ]);
-    return (result.documents[0] as unknown as SandboxTrace) ?? null;
+    const { data, error } = await supabaseServer
+      .from(TABLES.SANDBOX_TRACES)
+      .select('*')
+      .eq('submissionId', submissionId)
+      .maybeSingle();
+
+    if (error || !data) return null;
+    return mapDoc<SandboxTrace>(data);
   } catch {
     return null;
   }
 }
 
 export async function listTracesByUser(userId: string, sourceId?: string): Promise<SandboxTrace[]> {
-  const queries = [Query.equal('userId', userId), Query.orderDesc('createdAt'), Query.limit(20)];
-  if (sourceId) queries.push(Query.equal('sourceId', sourceId));
-  const result = await serverDatabases.listDocuments(DB_ID, COLLECTIONS.SANDBOX_TRACES, queries);
-  return result.documents as unknown as SandboxTrace[];
+  let query = supabaseServer
+    .from(TABLES.SANDBOX_TRACES)
+    .select('*')
+    .eq('userId', userId);
+
+  if (sourceId) {
+    query = query.eq('sourceId', sourceId);
+  }
+
+  const { data, error } = await query
+    .order('createdAt', { ascending: false })
+    .limit(20);
+
+  if (error || !data) return [];
+  return mapDoc<SandboxTrace[]>(data);
 }
 
 export function parseTraceFrames(trace: SandboxTrace): TraceFrame[] {

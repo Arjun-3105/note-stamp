@@ -24,6 +24,8 @@ interface TopicRoadmapProps {
   onSelectNode: (node: RoadmapNode) => void;
   isOpen: boolean;
   onToggle: () => void;
+  completedTopics?: string[];
+  onToggleTopic?: (nodeId: string) => void;
 }
 
 const DIFFICULTY_STYLES: Record<string, { bg: string; text: string; dot: string }> = {
@@ -52,8 +54,13 @@ export function TopicRoadmap({
   onSelectNode,
   isOpen,
   onToggle,
+  completedTopics = [],
+  onToggleTopic,
 }: TopicRoadmapProps) {
   const [hoveredId, setHoveredId] = useState<string | null>(null);
+  const completedSet = new Set(completedTopics);
+  const completedCount = nodes.filter(n => completedSet.has(n.id)).length;
+  const progressPct = nodes.length ? Math.round((completedCount / nodes.length) * 100) : 0;
 
   const connectedIds = selectedNodeId
     ? getConnectedNodeIds(selectedNodeId, edges)
@@ -80,6 +87,9 @@ export function TopicRoadmap({
           <span className="text-[15px] font-bold text-[#F5F6F8]">Topic Roadmap</span>
           <span className="text-[13px] text-[#A2A8B5] font-medium ml-2">
             {nodes.length} concepts
+            {completedCount > 0 && (
+              <span className="ml-2 text-[#42C67A] font-bold">· {completedCount}/{nodes.length} done ({progressPct}%)</span>
+            )}
             {selectedNodeId && (
               <span className="ml-2 text-[#7C5CFF] font-semibold">
                 · {nodes.find(n => n.id === selectedNodeId)?.label}
@@ -104,7 +114,19 @@ export function TopicRoadmap({
 
       {/* Roadmap Body */}
       {isOpen && (
-        <div className="px-5 pb-5 overflow-y-auto border-t border-[#252B36]" style={{ maxHeight: '320px' }}>
+        <div className="px-5 pb-5 overflow-y-auto border-t border-[#252B36]" style={{ maxHeight: '360px' }}>
+          {/* Progress bar */}
+          {nodes.length > 0 && (
+            <div className="mt-4 mb-3">
+              <div className="flex items-center justify-between mb-1.5">
+                <span className="text-[11px] font-bold uppercase tracking-widest text-[#A2A8B5]">Your progress</span>
+                <span className="text-[11px] font-bold text-[#42C67A]">{completedCount}/{nodes.length} topics</span>
+              </div>
+              <div className="h-1.5 rounded-full bg-[#0F1115] border border-[#252B36] overflow-hidden">
+                <div className="h-full bg-[#42C67A] transition-all" style={{ width: `${progressPct}%` }} />
+              </div>
+            </div>
+          )}
           {/* Legend */}
           <div className="flex items-center gap-4 mb-5 mt-4 text-[13px] font-medium text-[#A2A8B5]">
             {['beginner', 'intermediate', 'advanced'].map(d => {
@@ -116,7 +138,7 @@ export function TopicRoadmap({
                 </span>
               );
             })}
-            <span className="ml-auto text-[#A2A8B5]/60 italic text-[12px]">Click to focus AI on that topic</span>
+            <span className="ml-auto text-[#A2A8B5]/60 italic text-[12px]">Click to focus AI • Check to mark done</span>
           </div>
 
           {/* Nodes by layer */}
@@ -137,29 +159,46 @@ export function TopicRoadmap({
                   const isHovered = hoveredId === node.id;
                   const isDimmed = selectedNodeId !== null && !isSelected && !isConnected;
 
+                  const isCompleted = completedSet.has(node.id);
                   return (
-                    <button
+                    <div
                       key={node.id}
-                      onClick={() => onSelectNode(node)}
-                      onMouseEnter={() => setHoveredId(node.id)}
-                      onMouseLeave={() => setHoveredId(null)}
                       className={`
-                        relative group/node flex items-center gap-2 px-3.5 py-2 rounded-[14px] border text-left
-                        transition-all duration-150 text-[13px] font-semibold cursor-pointer shadow-sm
+                        relative group/node flex items-center gap-1.5 px-2.5 py-2 rounded-[14px] border text-left
+                        transition-all duration-150 shadow-sm
                         ${isSelected
-                          ? 'bg-[#7C5CFF] border-[#7C5CFF] text-white shadow-md shadow-[#7C5CFF]/20'
+                          ? 'bg-[#7C5CFF] border-[#7C5CFF] shadow-md shadow-[#7C5CFF]/20'
+                          : isCompleted
+                          ? 'bg-[#42C67A]/10 border-[#42C67A]/30 opacity-100'
                           : isConnected
-                          ? `${style.bg} border-current/30 ${style.text} opacity-90`
+                          ? `${style.bg} border-current/30 opacity-90`
                           : isDimmed
-                          ? 'bg-[#0F1115] border-[#252B36] text-[#A2A8B5]/40 opacity-50'
-                          : `${style.bg} border-transparent ${style.text} hover:border-current/30 hover:shadow`
+                          ? 'bg-[#0F1115] border-[#252B36] opacity-50'
+                          : `${style.bg} border-transparent hover:border-current/30 hover:shadow`
                         }
                       `}
                     >
-                      <span className={`w-2 h-2 rounded-full shrink-0 ${isSelected ? 'bg-white' : style.dot}`} />
-                      <span className="truncate max-w-[180px] text-[#F5F6F8]">{node.label}</span>
-                      {isConnected && !isSelected && (
+                      <button
+                        onClick={() => onSelectNode(node)}
+                        onMouseEnter={() => setHoveredId(node.id)}
+                        onMouseLeave={() => setHoveredId(null)}
+                        className="flex items-center gap-2 text-[13px] font-semibold flex-1 min-w-0 text-left"
+                      >
+                      <span className={`w-2 h-2 rounded-full shrink-0 ${isSelected ? 'bg-white' : isCompleted ? 'bg-[#42C67A]' : style.dot}`} />
+                      <span className={`truncate max-w-[150px] ${isCompleted ? 'text-[#42C67A]' : isSelected ? 'text-white' : 'text-[#F5F6F8]'}`}>{node.label}</span>
+                      {isCompleted && <span className="text-[10px] font-bold text-[#42C67A] ml-1">✓</span>}
+                      {isConnected && !isSelected && !isCompleted && (
                         <span className="text-[10px] opacity-70 font-bold uppercase tracking-wider ml-1">related</span>
+                      )}
+                      </button>
+                      {onToggleTopic && (
+                        <button
+                          onClick={(e) => { e.stopPropagation(); onToggleTopic(node.id); }}
+                          title={isCompleted ? 'Mark incomplete' : 'Mark completed'}
+                          className={`w-6 h-6 rounded-full border flex items-center justify-center shrink-0 transition-all text-[11px] font-bold ${isCompleted ? 'bg-[#42C67A] border-[#42C67A] text-white' : 'bg-[#0F1115] border-[#252B36] text-[#A2A8B5] hover:border-[#42C67A]/40 hover:text-[#42C67A]'}`}
+                        >
+                          {isCompleted ? '✓' : '+'}
+                        </button>
                       )}
 
                       {/* Hover tooltip */}
@@ -171,7 +210,7 @@ export function TopicRoadmap({
                           </div>
                         </div>
                       )}
-                    </button>
+                    </div>
                   );
                 })}
               </div>

@@ -2,7 +2,10 @@ import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@clerk/nextjs/server';
 import { createSource, updateSourceStatus } from '@/lib/db/sources';
 import { calculateInputHash, normalizeText, extractMetadata, isEducationalContent } from '@/lib/ingestion/helpers';
-import pdf from 'pdf-parse';
+import { extractPdfPages } from '@/lib/ingestion/pdf-pages';
+import { saveLocalTranscript } from '@/lib/local-db';
+import { chunkPages, saveSourceChunks } from '@/lib/source-chunks';
+import { saveSourcePages } from '@/lib/source-pages';
 
 /**
  * POST /api/ingest/pdf
@@ -33,25 +36,22 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Convert file to buffer
     const arrayBuffer = await file.arrayBuffer();
     const buffer = Buffer.from(arrayBuffer);
 
-    // Parse PDF
-    let pdfData;
+    let extracted;
     try {
-      pdfData = await pdf(buffer);
-    } catch (error) {
+      extracted = await extractPdfPages(buffer);
+    } catch {
       return NextResponse.json(
         { error: 'Failed to parse PDF. File may be corrupted or use unsupported format.' },
         { status: 400 }
       );
     }
 
-    const rawText = pdfData.text || '';
-    const normalizedText = normalizeText(rawText);
+    const structuredText = extracted.fullText;
+    const normalizedText = normalizeText(structuredText);
 
-    // Check if educational
     if (!isEducationalContent(normalizedText)) {
       return NextResponse.json(
         {
@@ -62,11 +62,8 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Calculate hash
     const inputHash = calculateInputHash(normalizedText);
-
-    // Extract metadata
-    const pageCount = pdfData.numpages || 0;
+    const pageCount = extracted.pageCount;
     const metadata = {
       ...extractMetadata(normalizedText, 'pdf'),
       pages: pageCount,
@@ -74,7 +71,6 @@ export async function POST(req: NextRequest) {
       fileSize: file.size,
     };
 
-    // Create source document
     const source = await createSource({
       workspaceId,
       userId,
@@ -84,15 +80,18 @@ export async function POST(req: NextRequest) {
       metadata,
     });
 
-    // Update status to ready
-    await updateSourceStatus(source.$id, 'ready');
+    await saveLocalTranscript(source.$id, structuredText);
+    await saveSourcePages(source.$id, extracted.pages);
+    await saveSourceChunks(source.$id, chunkPages(source.$id, extracted.pages));
+
+    await updateSourceStatus(source.$id, 'ready', `data/transcripts/${source.$id}.txt`);
 
     return NextResponse.json({
       sourceId: source.$id,
       title: source.title,
       pageCount,
       wordCount: metadata.wordCount,
-      textLength: normalizedText.length,
+      textLength: structuredText.length,
       message: 'PDF imported successfully',
     });
   } catch (error) {
@@ -103,4 +102,3 @@ export async function POST(req: NextRequest) {
     );
   }
 }
-

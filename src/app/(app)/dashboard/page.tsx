@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useUser } from '@clerk/nextjs';
 import Link from 'next/link';
+import { WalletButton } from '@/components/wallet/WalletButton';
 
 /* ─── Types (mirror the API shape) ────────────────────────────── */
 interface DashboardData {
@@ -87,6 +88,7 @@ export default function DashboardPage() {
   const firstName = user?.firstName || 'there';
 
   const [data, setData] = useState<DashboardData | null>(null);
+  const [progressPctMap, setProgressPctMap] = useState<Record<string, number>>({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -98,8 +100,37 @@ export default function DashboardPage() {
       .finally(() => setLoading(false));
   }, []);
 
+  useEffect(() => {
+    // fetch chunk/page/topic progress and override workspace % with tracked progress
+    fetch('/api/progress')
+      .then(r => r.ok ? r.json() : null)
+      .then(d => {
+        if (!d?.progresses) return;
+        const byWs: Record<string, {done:number,total:number}> = {};
+        for (const p of d.progresses) {
+          const ws = p.workspaceId;
+          if (!ws) continue;
+          const done = (p.completedChunks?.length||0)+(p.completedPages?.length||0)+(p.completedTopics?.length||0);
+          const total = (p.totalChunks||0)+(p.totalPages||0)+(p.totalTopics||0);
+          if (!total) continue;
+          if (!byWs[ws]) byWs[ws] = {done:0,total:0};
+          byWs[ws].done += done;
+          byWs[ws].total += total;
+        }
+        const pct: Record<string, number> = {};
+        for (const [ws, v] of Object.entries(byWs)) pct[ws]= v.total ? Math.round((v.done/v.total)*100) : 0;
+        setProgressPctMap(pct);
+      }).catch(()=>{});
+  }, []);
+
+  // inject tracked pct into workspace list (fallback to API pct)
+  const workspacesWithPct = (data?.workspaces||[]).map(ws => ({
+    ...ws,
+    trackedPct: progressPctMap[ws.id],
+    displayPct: progressPctMap[ws.id] !== undefined ? progressPctMap[ws.id] : ws.pct,
+  }));
   // Featured workspace = the one with highest pct progress (most recent if tie)
-  const featured = data?.workspaces[0] ?? null;
+  const featured = workspacesWithPct[0] ?? null;
   const featuredColor = featured ? WS_PALETTE[0] : '#6c63ff';
 
   return (
@@ -111,13 +142,25 @@ export default function DashboardPage() {
       <div className="flex-1 overflow-y-auto px-8 py-7">
 
         {/* Welcome */}
-        <div className="mb-6">
+        <div className="mb-5">
           <h1 style={{ fontSize: 24, fontWeight: 800, color: '#1a1a2e', margin: 0 }}>
             Welcome back, {firstName}! 👋
           </h1>
           <p style={{ fontSize: 13, color: '#888', marginTop: 4 }}>
             Continue your learning journey. You&apos;ve got this!
           </p>
+        </div>
+
+        {/* Wallet banner — global accessible */}
+        <div className="rounded-2xl p-4 mb-6 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3" style={{ background: 'linear-gradient(135deg, #f0fdf4, #ecfdf5)', border: '1px solid #bbf7d0' }}>
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl flex items-center justify-center text-lg" style={{ background: '#15803d18', border: '1px solid #bbf7d0' }}>🦊</div>
+            <div>
+              <p style={{ fontSize: 13, fontWeight: 700, color: '#15803d' }}>Web3 Wallet • Sepolia</p>
+              <p style={{ fontSize: 11, color: '#6b7280' }}>Link MetaMask to mint NFT certificates after passing quizzes</p>
+            </div>
+          </div>
+          <WalletButton variant="compact" labelConnect="🦊 Connect MetaMask" className="shrink-0" />
         </div>
 
         {/* Featured course card */}
@@ -163,9 +206,10 @@ export default function DashboardPage() {
                 {/* Progress */}
                 <div className="flex items-center gap-3 mb-3">
                   <div className="flex-1 h-1.5 rounded-full" style={{ background: '#f0f0f5' }}>
-                    <div className="h-full rounded-full transition-all" style={{ width: `${featured.pct}%`, background: featuredColor }} />
+                    <div className="h-full rounded-full transition-all" style={{ width: `${(featured as any).displayPct ?? featured.pct}%`, background: featuredColor }} />
                   </div>
-                  <span style={{ fontSize: 12, fontWeight: 700, color: featuredColor, width: 36 }}>{featured.pct}%</span>
+                  <span style={{ fontSize: 12, fontWeight: 700, color: featuredColor, width: 36 }}>{(featured as any).displayPct ?? featured.pct}%</span>
+                  {(featured as any).trackedPct !== undefined && <span style={{ fontSize: 10, color: '#42C67A', fontWeight: 700, background: '#42C67A15', border: '1px solid #42C67A30', padding: '1px 6px', borderRadius: 999 }} title="Tracked from chunks/pages/topics">tracked</span>}
                 </div>
                 {/* Stats */}
                 <div className="flex items-center gap-5">
@@ -214,10 +258,11 @@ export default function DashboardPage() {
             <div className="grid grid-cols-4 gap-3">
               {[...Array(4)].map((_, i) => <Skeleton key={i} h={140} r={16} />)}
             </div>
-          ) : data && data.workspaces.length > 0 ? (
+          ) : data && workspacesWithPct.length > 0 ? (
             <div className="grid grid-cols-4 gap-3">
-              {data.workspaces.slice(0, 3).map((ws, i) => {
+              {workspacesWithPct.slice(0, 3).map((ws: any, i:number) => {
                 const color = WS_PALETTE[i % WS_PALETTE.length];
+                const pct = ws.displayPct ?? ws.pct;
                 return (
                   <Link
                     key={ws.id}
@@ -235,12 +280,12 @@ export default function DashboardPage() {
                       {ws.title}
                     </p>
                     <p style={{ fontSize: 11, color: '#aaa', marginBottom: 10 }}>
-                      {ws.sourceCount} source{ws.sourceCount !== 1 ? 's' : ''}
+                      {ws.sourceCount} source{ws.sourceCount !== 1 ? 's' : ''} {ws.trackedPct!==undefined && <span style={{ color: '#42C67A', fontWeight: 700 }}>• tracked {pct}%</span>}
                     </p>
                     <div className="h-1 rounded-full mb-1.5" style={{ background: '#f0f0f5' }}>
-                      <div className="h-full rounded-full" style={{ width: `${ws.pct}%`, background: color }} />
+                      <div className="h-full rounded-full" style={{ width: `${pct}%`, background: color }} />
                     </div>
-                    <p style={{ fontSize: 11, fontWeight: 700, color: color }}>{ws.pct}%</p>
+                    <p style={{ fontSize: 11, fontWeight: 700, color: color }}>{pct}%</p>
                   </Link>
                 );
               })}
@@ -353,6 +398,15 @@ export default function DashboardPage() {
           </div>
         ) : data ? (
           <>
+            {/* Wallet — right sidebar, always visible */}
+            <div className="rounded-2xl p-4 mb-6" style={{ background: 'linear-gradient(135deg, #f0fdf4, #ecfdf5)', border: '1px solid #bbf7d0' }}>
+              <div className="flex items-center gap-2 mb-2">
+                <span className="text-sm">🦊</span>
+                <p style={{ fontSize: 12, fontWeight: 700, color: '#15803d' }}>Wallet for Certificates</p>
+              </div>
+              <p style={{ fontSize: 11, color: '#6b7280', lineHeight: 1.4, marginBottom: 10 }}>Connect once — mint from any quiz, dashboard, or TopBar.</p>
+              <WalletButton variant="compact" labelConnect="Connect MetaMask" className="w-full justify-center" />
+            </div>
             {/* Learning Streak */}
             <div className="mb-6">
               <p style={{ fontSize: 13, fontWeight: 700, color: '#1a1a2e', marginBottom: 12 }}>Learning Streak</p>

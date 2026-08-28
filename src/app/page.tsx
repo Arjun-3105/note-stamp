@@ -4,6 +4,7 @@ import { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import { useAuth } from '@clerk/nextjs';
 import { motion, AnimatePresence } from 'framer-motion';
+import { WalletButton } from '@/components/wallet/WalletButton';
 
 /* ─── Data ──────────────────────────────────────────────────────── */
 const AI_MODES = [
@@ -271,7 +272,10 @@ export default function HomePage() {
           ))}
         </nav>
 
-        <div className="flex items-center gap-4">
+        <div className="flex items-center gap-3">
+          <div className="hidden sm:flex">
+            <WalletButton variant="header" labelConnect="🦊 Connect Wallet" className="hidden md:inline-flex" />
+          </div>
           {isSignedIn ? (
             <Link href="/dashboard" className="px-6 py-3 rounded-[12px] text-[15px] font-bold bg-[#6c63ff] hover:bg-[#5a52e6] transition-colors shadow-md" style={{ color: '#ffffff' }}>
               Dashboard
@@ -325,7 +329,7 @@ export default function HomePage() {
 
           <motion.div 
             initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.6, delay: 0.3 }}
-            className="flex flex-col sm:flex-row items-center gap-4 w-full justify-center lg:justify-start mb-12"
+            className="flex flex-col sm:flex-row items-center gap-4 w-full justify-center lg:justify-start mb-6"
           >
             <Link href={isSignedIn ? '/dashboard' : '/sign-up'} className="w-full sm:w-auto flex items-center justify-center gap-2 px-8 py-4 rounded-[12px] font-bold bg-[#6c63ff] hover:bg-[#5a52e6] shadow-[0_8px_20px_rgba(108,99,255,0.25)] hover:-translate-y-0.5 transition-all text-[16px]" style={{ color: '#ffffff' }}>
               Get Started Free →
@@ -334,6 +338,13 @@ export default function HomePage() {
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><polygon points="5 3 19 12 5 21 5 3" /></svg>
               See How It Works
             </a>
+          </motion.div>
+          <motion.div
+            initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.6, delay: 0.4 }}
+            className="flex flex-col sm:flex-row items-center gap-3 justify-center lg:justify-start mb-12"
+          >
+            <WalletButton variant="header" labelConnect="🦊 Link MetaMask — for NFT Certificates" className="bg-white border border-[#e5e7eb] text-[#111827] hover:bg-[#f9fafb] !text-[#6c63ff]" />
+            <span className="text-[13px] font-semibold hidden sm:inline" style={{ color: '#9ca3af' }}>Mint on Sepolia • No gas to connect</span>
           </motion.div>
 
           {/* Trust Row */}
@@ -498,7 +509,8 @@ export default function HomePage() {
             <span className="font-extrabold text-[18px]" style={{ color: '#111827' }}>LearnLoop</span>
           </div>
           
-          <div className="flex items-center gap-8">
+          <div className="flex items-center gap-4 flex-wrap justify-center">
+            <WalletButton variant="compact" labelConnect="🦊 Connect Wallet" />
             <a href="#" className="text-[15px] font-bold hover:text-[#111827] transition-colors" style={{ color: '#6b7280' }}>Terms</a>
             <a href="#" className="text-[15px] font-bold hover:text-[#111827] transition-colors" style={{ color: '#6b7280' }}>Privacy</a>
             <a href="#" className="text-[15px] font-bold hover:text-[#111827] transition-colors" style={{ color: '#6b7280' }}>Twitter</a>
