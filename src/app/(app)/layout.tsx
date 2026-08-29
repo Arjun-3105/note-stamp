@@ -1,14 +1,21 @@
-import { ReactNode } from 'react';
+'use client';
+
+import { ReactNode, useState } from 'react';
 import { Sidebar } from '@/components/layout/Sidebar';
 import { TopBar } from '@/components/layout/TopBar';
 
 export default function AppLayout({ children }: { children: ReactNode }) {
+  const [isMobileOpen, setIsMobileOpen] = useState(false);
+
   return (
-    <div style={{ display: 'flex', height: '100vh', overflow: 'hidden', background: '#f8f8fc', fontFamily: "'Inter', -apple-system, sans-serif" }}>
-      <Sidebar />
-      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
-        <TopBar />
-        <main style={{ flex: 1, overflowY: 'auto' }}>
+    <div className="flex h-screen overflow-hidden bg-[#fafafa] font-sans text-gray-900">
+      <Sidebar
+        isMobileOpen={isMobileOpen}
+        onMobileClose={() => setIsMobileOpen(false)}
+      />
+      <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
+        <TopBar onToggleMobileMenu={() => setIsMobileOpen(!isMobileOpen)} />
+        <main className="flex-1 overflow-y-auto">
           {children}
         </main>
       </div>

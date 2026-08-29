@@ -1,127 +1,142 @@
-"use client";
+'use client';
 
-import { useEffect, useState } from "react";
-import { useAuth } from "@clerk/nextjs";
-import Link from "next/link";
-import { motion } from "framer-motion";
-import { Workspace } from "@/lib/db/workspaces";
+import { useEffect, useState } from 'react';
+import { useAuth } from '@clerk/nextjs';
+import Link from 'next/link';
+import { Workspace } from '@/lib/db/workspaces';
+import { CreateWorkspaceModal } from '@/components/workspace/CreateWorkspaceModal';
 
 export default function WorkspaceListPage() {
   const { userId } = useAuth();
   const [workspaces, setWorkspaces] = useState<Workspace[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [isModalOpen, setIsModalOpen] = useState(false);
 
   useEffect(() => {
     if (!userId) return;
-    fetch("/api/workspaces")
-      .then(r => r.ok ? r.json() : Promise.reject("failed"))
-      .then(d => setWorkspaces(d.workspaces || []))
-      .catch(e => setError(String(e)))
+    fetch('/api/workspaces')
+      .then((r) => (r.ok ? r.json() : Promise.reject('Failed to load workspaces')))
+      .then((d) => setWorkspaces(d.workspaces || []))
+      .catch((e) => setError(String(e)))
       .finally(() => setLoading(false));
   }, [userId]);
 
-  if (loading) {
-    return (
-      <div className="page-container">
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))", gap: 16, marginTop: 48 }}>
-          {[1,2,3].map(i => (
-            <div key={i} className="card" style={{ height: 130, background: "rgba(255,255,255,0.03)", animation: "pulse 2s infinite" }} />
-          ))}
-        </div>
-      </div>
-    );
-  }
-
   return (
-    <div className="page-container">
-      {/* Header */}
-      <motion.div
-        className="page-header"
-        style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", flexWrap: "wrap", gap: 12 }}
-        initial={{ opacity: 0, y: 10 }}
-        animate={{ opacity: 1, y: 0 }}
-      >
-        <div>
-          <h1 className="page-title">My Workspaces</h1>
-          <p className="page-subtitle">{workspaces.length} workspace{workspaces.length !== 1 ? "s" : ""}</p>
-        </div>
-        <Link href="/workspace/new" className="btn btn-primary">
-          + New Workspace
-        </Link>
-      </motion.div>
+    <div className="min-h-screen bg-[#fafafa] p-4 sm:p-6 lg:p-10 font-sans text-gray-900">
+      <div className="max-w-6xl mx-auto space-y-8">
+        {/* Header */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-gray-200 pb-6">
+          <div>
+            <div className="flex items-center gap-2 text-sm text-gray-500 mb-1">
+              <Link href="/dashboard" className="hover:text-indigo-600 transition-colors">
+                Dashboard
+              </Link>
+              <span>/</span>
+              <span className="font-semibold text-gray-800">My Learning</span>
+            </div>
+            <h1 className="text-3xl font-extrabold text-gray-900 tracking-tight">
+              My Learning Workspaces
+            </h1>
+            <p className="text-gray-600 text-sm mt-1">
+              {workspaces.length} workspace{workspaces.length !== 1 ? 's' : ''} total
+            </p>
+          </div>
 
-      {error && (
-        <div style={{ background: "rgba(239,68,68,0.1)", border: "1px solid rgba(239,68,68,0.3)", borderRadius: 10, padding: "12px 16px", color: "#f87171", fontSize: 14, marginBottom: 20 }}>
-          {error}
+          <button
+            onClick={() => setIsModalOpen(true)}
+            className="inline-flex items-center justify-center px-4 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-sm transition-all shadow-sm shrink-0 gap-2"
+          >
+            <span className="text-lg leading-none">+</span>
+            <span>New Workspace</span>
+          </button>
         </div>
-      )}
 
-      {workspaces.length === 0 ? (
-        <motion.div
-          className="empty-state"
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ delay: 0.1 }}
-        >
-          <svg className="empty-state-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
-            <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z" strokeLinecap="round" strokeLinejoin="round" />
-          </svg>
-          <p style={{ fontWeight: 600, fontSize: 16, color: "var(--color-text-primary)", margin: 0 }}>No workspaces yet</p>
-          <p style={{ fontSize: 14, color: "var(--color-text-secondary)", margin: 0 }}>Create a workspace to start organising your learning</p>
-          <Link href="/workspace/new" className="btn btn-primary" style={{ marginTop: 8 }}>
-            Create your first workspace
-          </Link>
-        </motion.div>
-      ) : (
-        <motion.div
-          style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))", gap: 16 }}
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ delay: 0.05 }}
-        >
-          {workspaces.map((ws, i) => (
-            <motion.div
-              key={ws.$id}
-              initial={{ opacity: 0, y: 12 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: i * 0.05 }}
+        {error && (
+          <div className="p-4 rounded-xl bg-red-50 border border-red-200 text-red-700 text-sm">
+            {error}
+          </div>
+        )}
+
+        {loading ? (
+          <div className="py-16 text-center text-gray-400 text-sm">
+            Loading your workspaces...
+          </div>
+        ) : workspaces.length === 0 ? (
+          <div className="py-16 text-center border-2 border-dashed border-gray-200 rounded-3xl bg-white p-8 space-y-4 shadow-sm">
+            <div className="w-16 h-16 bg-indigo-50 rounded-2xl flex items-center justify-center text-3xl mx-auto">
+              📂
+            </div>
+            <div className="space-y-1">
+              <p className="font-extrabold text-lg text-gray-900">No workspaces yet</p>
+              <p className="text-xs text-gray-500 max-w-sm mx-auto">
+                Create a workspace to organize your YouTube videos, PDFs, and notes by course or subject.
+              </p>
+            </div>
+            <button
+              onClick={() => setIsModalOpen(true)}
+              className="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold transition-all shadow-sm inline-flex items-center gap-2"
             >
-              <Link href={`/workspace/${ws.$id}`} className="workspace-card">
-                {/* Title row */}
-                <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 8 }}>
-                  <h3 style={{ fontWeight: 700, fontSize: 15, color: "var(--color-text-primary)", margin: 0, lineHeight: 1.3 }}>
+              <span>+ Create your first workspace</span>
+            </button>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+            {workspaces.map((ws) => (
+              <Link
+                key={ws.$id}
+                href={`/workspace/${ws.$id}`}
+                className="bg-white rounded-2xl border border-gray-100 p-6 shadow-sm hover:shadow-md hover:border-indigo-200 transition-all flex flex-col justify-between space-y-4 group"
+                style={{ textDecoration: 'none' }}
+              >
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <span className="w-9 h-9 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center font-bold text-sm">
+                      📂
+                    </span>
+                    <span className="text-[10px] font-extrabold uppercase px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-700">
+                      {ws.status || 'Active'}
+                    </span>
+                  </div>
+
+                  <h3 className="font-bold text-gray-900 text-lg group-hover:text-indigo-600 transition-colors line-clamp-1">
                     {ws.title}
                   </h3>
-                  <span className={`badge ${ws.status === "active" ? "badge-green" : "badge-blue"}`}>
-                    {ws.status}
+
+                  {ws.description && (
+                    <p className="text-xs text-gray-500 line-clamp-2 leading-relaxed">
+                      {ws.description}
+                    </p>
+                  )}
+                </div>
+
+                <div className="pt-4 border-t border-gray-100 flex items-center justify-between text-xs text-gray-500">
+                  <span>{ws.sourceCount || 0} material sources</span>
+                  <span className="font-bold text-indigo-600 group-hover:translate-x-0.5 transition-transform">
+                    Open →
                   </span>
                 </div>
-
-                {ws.description && (
-                  <p style={{ margin: "8px 0 0", fontSize: 13, color: "var(--color-text-secondary)", lineHeight: 1.5 }}>
-                    {ws.description}
-                  </p>
-                )}
-
-                {/* Progress */}
-                <div style={{ marginTop: 16 }}>
-                  <div className="progress-track">
-                    <div
-                      className="progress-fill green"
-                      style={{ width: ws.totalUnits > 0 ? `${(ws.completedUnits / ws.totalUnits) * 100}%` : "0%" }}
-                    />
-                  </div>
-                  <div style={{ display: "flex", justifyContent: "space-between", marginTop: 6, fontSize: 12, color: "var(--color-text-muted)" }}>
-                    <span>{ws.sourceCount} source{ws.sourceCount !== 1 ? "s" : ""}</span>
-                    <span>{ws.completedUnits}/{ws.totalUnits} units</span>
-                  </div>
-                </div>
               </Link>
-            </motion.div>
-          ))}
-        </motion.div>
-      )}
+            ))}
+
+            {/* Create Card */}
+            <button
+              onClick={() => setIsModalOpen(true)}
+              className="rounded-2xl border-2 border-dashed border-gray-200 p-8 flex flex-col items-center justify-center gap-3 hover:border-indigo-400 hover:bg-indigo-50/30 transition-all text-center group cursor-pointer"
+            >
+              <div className="w-12 h-12 rounded-2xl bg-indigo-50 group-hover:bg-indigo-600 text-indigo-600 group-hover:text-white flex items-center justify-center font-black text-xl transition-colors">
+                +
+              </div>
+              <span className="text-xs font-bold text-gray-700 group-hover:text-indigo-600">
+                Create New Workspace
+              </span>
+            </button>
+          </div>
+        )}
+      </div>
+
+      {/* Global Modal */}
+      <CreateWorkspaceModal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} />
     </div>
   );
 }
