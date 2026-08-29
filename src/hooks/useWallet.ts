@@ -34,18 +34,37 @@ export function useWallet() {
   }, [selectedWallet, walletOptions]);
 
   useEffect(() => {
+    const savedAddress = window.localStorage.getItem("learnloop_wallet_address") || "";
+    const savedWalletIndex = window.localStorage.getItem("learnloop_wallet_index") || "0";
+    if (savedAddress) setWalletAddress(savedAddress);
+    setSelectedWallet(savedWalletIndex);
+
+    const checkEagerConnect = async (providers: InjectedProvider[]) => {
+      const idx = Number(savedWalletIndex);
+      const provider = providers[idx] || providers[0];
+      if (provider) {
+        try {
+          const accounts = (await provider.request({ method: "eth_accounts" })) as string[];
+          if (Array.isArray(accounts) && accounts[0]) {
+            setWalletAddress(accounts[0]);
+            window.localStorage.setItem("learnloop_wallet_address", accounts[0]);
+          } else if (savedAddress) {
+            // Address was disconnected in extension
+            window.localStorage.removeItem("learnloop_wallet_address");
+            setWalletAddress("");
+          }
+        } catch {}
+      }
+    };
+
     const detect = () => {
       const ethereum = (window as Window & { ethereum?: EthereumLike }).ethereum;
       if (!ethereum) return false;
       const providers = ethereum.providers && ethereum.providers.length > 0 ? ethereum.providers : [ethereum];
       setWalletOptions(providers);
+      checkEagerConnect(providers);
       return true;
     };
-
-    const savedAddress = window.localStorage.getItem("learnloop_wallet_address") || "";
-    const savedWalletIndex = window.localStorage.getItem("learnloop_wallet_index") || "0";
-    setWalletAddress(savedAddress);
-    setSelectedWallet(savedWalletIndex);
 
     if (!detect()) {
       const timer = window.setInterval(() => {
@@ -108,4 +127,3 @@ export function useWallet() {
     error,
   };
 }
-
