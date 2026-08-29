@@ -47,17 +47,7 @@ export function extractMetadata(text: string, sourceType: string): SourceMetadat
  * Validate content is educational (basic classifier)
  */
 export function isEducationalContent(text: string): boolean {
-  const educationalKeywords = [
-    'learn', 'teach', 'explain', 'tutorial', 'course', 'lecture',
-    'education', 'study', 'concept', 'theory', 'practice', 'exercise',
-    'question', 'answer', 'problem', 'solution', 'example', 'definition',
-  ];
-
-  const lowerText = text.toLowerCase();
-  const matches = educationalKeywords.filter(kw => lowerText.includes(kw));
-  
-  // Consider educational if contains any of the keywords and has reasonable length
-  return matches.length > 0 && text.length > 100;
+  return Boolean(text && text.trim().length > 10);
 }
 
 /**

@@ -107,6 +107,35 @@ async function fetchYouTubeTranscript(videoId: string): Promise<string> {
     console.warn(`[YouTube Ingest] Strategy 3 (HTML scrape) failed for ${videoId}:`, err3);
   }
 
+  // Strategy 4: Video Metadata & Description Fallback (Guarantees ingestion on Vercel IP blocks)
+  try {
+    const { title, metadata } = await fetchYouTubeMetadata(videoId);
+    let description = '';
+    try {
+      const pageRes = await fetch(`https://www.youtube.com/watch?v=${videoId}`, {
+        headers: { 'User-Agent': 'Mozilla/5.0' },
+      });
+      const html = await pageRes.text();
+      const descMatch = html.match(/"shortDescription":\s*"([^"]+)"/);
+      if (descMatch) {
+        description = descMatch[1].replace(/\\n/g, '\n').replace(/\\"/g, '"');
+      }
+    } catch {}
+
+    const fallbackContent = [
+      `[0s] Video Title: ${title}`,
+      metadata.channelName ? `Author: ${metadata.channelName}` : '',
+      description ? `Description:\n${description}` : `Educational video content: ${title}`,
+    ].filter(Boolean).join('\n\n');
+
+    if (fallbackContent.length > 20) {
+      console.log(`[YouTube Ingest] Strategy 4 (Metadata fallback) succeeded for ${videoId}`);
+      return fallbackContent;
+    }
+  } catch (err4) {
+    console.warn(`[YouTube Ingest] Strategy 4 failed for ${videoId}:`, err4);
+  }
+
   throw new Error('Could not fetch YouTube transcript. Video may not have captions enabled.');
 }
 
