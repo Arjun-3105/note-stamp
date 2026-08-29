@@ -19,14 +19,22 @@ export interface ChunkSourcePage {
   text: string;
 }
 
-const CHUNK_DIR = path.join(process.cwd(), 'data', 'source-chunks');
+import os from 'os';
+
+const BASE_DIR = process.env.VERCEL || process.env.NODE_ENV === 'production'
+  ? path.join(os.tmpdir(), 'learnloop-data')
+  : path.join(process.cwd(), 'data');
+
+const CHUNK_DIR = path.join(BASE_DIR, 'source-chunks');
 const DEFAULT_WORDS_PER_CHUNK = 750;
 const DEFAULT_OVERLAP_WORDS = 120;
 const URL_WORDS_PER_CHUNK = 450;
 const MAX_CONTEXT_CHARS = 60000;
 
 async function ensureChunkDir() {
-  await fs.mkdir(CHUNK_DIR, { recursive: true });
+  try {
+    await fs.mkdir(CHUNK_DIR, { recursive: true });
+  } catch (error) {}
 }
 
 function wordsOf(text: string): string[] {
@@ -200,9 +208,13 @@ export function chunkPages(
 }
 
 export async function saveSourceChunks(sourceId: string, chunks: SourceChunk[]): Promise<void> {
-  await ensureChunkDir();
-  const filePath = path.join(CHUNK_DIR, `${sourceId}.jsonl`);
-  await fs.writeFile(filePath, chunks.map(chunk => JSON.stringify(chunk)).join('\n'), 'utf-8');
+  try {
+    await ensureChunkDir();
+    const filePath = path.join(CHUNK_DIR, `${sourceId}.jsonl`);
+    await fs.writeFile(filePath, chunks.map(chunk => JSON.stringify(chunk)).join('\n'), 'utf-8');
+  } catch (error) {
+    console.warn('[source-chunks] Skipping local chunk file write:', error);
+  }
 }
 
 export async function getSourceChunks(sourceId: string): Promise<SourceChunk[]> {

@@ -14,11 +14,19 @@ export interface UserProgress {
   updatedAt: string;
 }
 
-const PROGRESS_DIR = path.join(process.cwd(), 'data', 'progress');
+import os from 'os';
+
+const BASE_DIR = process.env.VERCEL || process.env.NODE_ENV === 'production'
+  ? path.join(os.tmpdir(), 'learnloop-data')
+  : path.join(process.cwd(), 'data');
+
+const PROGRESS_DIR = path.join(BASE_DIR, 'progress');
 
 async function ensureDir(userId?: string) {
-  const dir = userId ? path.join(PROGRESS_DIR, userId) : PROGRESS_DIR;
-  await fs.mkdir(dir, { recursive: true });
+  try {
+    const dir = userId ? path.join(PROGRESS_DIR, userId) : PROGRESS_DIR;
+    await fs.mkdir(dir, { recursive: true });
+  } catch (error) {}
 }
 
 function progressPath(userId: string, sourceId: string) {
@@ -35,7 +43,6 @@ export async function getProgress(userId: string, sourceId: string): Promise<Use
 }
 
 export async function saveProgress(progress: UserProgress): Promise<UserProgress> {
-  await ensureDir(progress.userId);
   const toSave: UserProgress = {
     ...progress,
     completedChunks: Array.from(new Set(progress.completedChunks)).sort((a, b) => a - b),
@@ -43,7 +50,12 @@ export async function saveProgress(progress: UserProgress): Promise<UserProgress
     completedTopics: Array.from(new Set(progress.completedTopics)).sort(),
     updatedAt: new Date().toISOString(),
   };
-  await fs.writeFile(progressPath(progress.userId, progress.sourceId), JSON.stringify(toSave, null, 2), 'utf-8');
+  try {
+    await ensureDir(progress.userId);
+    await fs.writeFile(progressPath(progress.userId, progress.sourceId), JSON.stringify(toSave, null, 2), 'utf-8');
+  } catch (error) {
+    console.warn('[progress] Skipping local progress file write:', error);
+  }
   return toSave;
 }
 

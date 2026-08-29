@@ -7,6 +7,8 @@ import { saveLocalTranscript } from '@/lib/local-db';
 import { chunkPages, saveSourceChunks } from '@/lib/source-chunks';
 import { saveSourcePages } from '@/lib/source-pages';
 
+export const maxDuration = 60;
+
 /**
  * POST /api/ingest/pdf
  * Extract text from uploaded PDF file
@@ -96,9 +98,10 @@ export async function POST(req: NextRequest) {
     });
   } catch (error) {
     console.error('PDF ingest error:', error);
+    const errorMessage = error instanceof Error ? error.message : 'Failed to ingest PDF';
     return NextResponse.json(
-      { error: 'Failed to ingest PDF' },
-      { status: 500 }
+      { error: errorMessage },
+      { status: 400 }
     );
   }
 }

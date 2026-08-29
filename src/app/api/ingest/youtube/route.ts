@@ -8,6 +8,8 @@ import { saveLocalTranscript } from '@/lib/local-db';
 import { callAI } from '@/lib/ai';
 import { chunkTextByWords, saveSourceChunks } from '@/lib/source-chunks';
 
+export const maxDuration = 60;
+
 const RequestSchema = z.object({
   videoUrl: z.string(),
   workspaceId: z.string(),
@@ -198,10 +200,10 @@ ${normalizedTranscript.slice(0, 300000)}
       );
     }
 
+    const errorMessage = error instanceof Error ? error.message : 'Failed to ingest YouTube content';
     return NextResponse.json(
-      { error: 'Failed to ingest YouTube content' },
-      { status: 500 }
+      { error: errorMessage },
+      { status: 400 }
     );
   }
 }
-
