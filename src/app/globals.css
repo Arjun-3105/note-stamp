@@ -24,12 +24,12 @@
   --color-warn-light:   rgba(255,184,77,0.15);
 
   /* Text */
-  --color-text-primary:   #F5F6F8;
-  --color-text-secondary: #A2A8B5;
-  --color-text-muted:     #6b7280;
+  --color-text-primary:   #0F172A;
+  --color-text-secondary: #475569;
+  --color-text-muted:     #64748B;
 
   /* Borders */
-  --color-border:       #252B36;
+  --color-border:       #E2E8F0;
   --color-border-focus: #7C5CFF;
 
   /* Typography */
@@ -53,8 +53,8 @@ html, body { height: 100%; }
 
 body {
   font-family: var(--font-sans);
-  background: #0F1115;
-  color: var(--color-text-primary);
+  background: #F8FAFC;
+  color: #0F172A;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   line-height: 1.6;
@@ -62,12 +62,9 @@ body {
 
 /* ── Typography helpers ─────────────────────────────────────────────────── */
 h1, h2, h3, h4, h5, h6 {
-  color: var(--color-text-primary);
   line-height: 1.25;
   letter-spacing: -0.02em;
 }
-
-p { color: var(--color-text-secondary); }
 
 /* ── Scrollbar ──────────────────────────────────────────────────────────── */
 * {

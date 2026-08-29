@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@clerk/nextjs/server';
 import { listWorkspacesByUser } from '@/lib/db/workspaces';
+import { listSourcesByWorkspace } from '@/lib/db/sources';
 
 /**
  * GET /api/workspaces
@@ -14,10 +15,19 @@ export async function GET(req: NextRequest) {
     }
 
     const workspaces = await listWorkspacesByUser(userId);
+    const workspacesWithCounts = await Promise.all(
+      workspaces.map(async (ws) => {
+        const sources = await listSourcesByWorkspace(ws.$id);
+        return {
+          ...ws,
+          sourceCount: sources.length,
+        };
+      })
+    );
 
     return NextResponse.json({
-      workspaces,
-      count: workspaces.length,
+      workspaces: workspacesWithCounts,
+      count: workspacesWithCounts.length,
     });
   } catch (error) {
     console.error('Workspaces list error:', error);
