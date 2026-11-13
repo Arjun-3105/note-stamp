@@ -11,7 +11,7 @@ import {
   buildAssistantContext,
   createSystemPrompt,
 } from '@/lib/assistant';
-import { callAI } from '@/lib/ai';
+import { callAI, formatAIErrorResponse } from '@/lib/ai';
 import { checkAssistantRateLimit } from '@/lib/ratelimit';
 import { z } from 'zod';
 import { verifyContextAccess } from '@/lib/auth/workspace';
@@ -148,10 +148,8 @@ export async function POST(req: NextRequest) {
         { status: 400 }
       );
     }
-    return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500 }
-    );
+    const { response, status } = formatAIErrorResponse(error, 'Internal server error');
+    return NextResponse.json(response, { status });
   }
 }
 

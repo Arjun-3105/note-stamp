@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@clerk/nextjs/server";
-import { callAI } from "@/lib/ai";
+import { callAI, formatAIErrorResponse } from "@/lib/ai";
 import { parseAiJson } from "@/lib/json";
 import { getSource } from "@/lib/db/sources";
 import { listNotesBySource } from "@/lib/db/notes";
@@ -266,10 +266,8 @@ ${excerpt}${notesExcerpt}
     return NextResponse.json({ topic: (data as any).topic || source?.title || 'Flashcards', cards: verifiedCards, sourceId: sourceId || null });
   } catch (error) {
     console.error('[flashcards] error', error);
-    return NextResponse.json(
-      { error: error instanceof Error ? error.message : "Failed to generate flashcards" },
-      { status: 500 }
-    );
+    const { response, status } = formatAIErrorResponse(error, 'Failed to generate flashcards');
+    return NextResponse.json(response, { status });
   }
 }
 

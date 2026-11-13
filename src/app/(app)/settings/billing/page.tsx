@@ -3,6 +3,7 @@ import React, { useState } from "react";
 import { usePlan } from "@/hooks/usePlan";
 import { motion } from "framer-motion";
 import Link from "next/link";
+import { SettingsTabs } from "@/components/settings/SettingsTabs";
 
 const FREE_FEATURES = [
   "1 workspace",
@@ -63,6 +64,7 @@ export default function BillingPage() {
 
   return (
     <div className="page-container">
+      <SettingsTabs />
       <motion.div className="page-header" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}>
         <h1 className="page-title">Billing &amp; Plans</h1>
         <p className="page-subtitle">Your current plan and available upgrades.</p>

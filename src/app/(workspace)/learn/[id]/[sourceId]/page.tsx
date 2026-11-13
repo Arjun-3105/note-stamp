@@ -17,6 +17,7 @@ import { ParsedCitation } from '@/lib/citations';
 import { FlashcardsView } from '@/components/learn/FlashcardsView';
 import { QuizView } from '@/components/learn/QuizView';
 import { PracticeView } from '@/components/learn/PracticeView';
+import { ApiKeyModal } from '@/components/keys/ApiKeyModal';
 
 const BlockNoteEditor = dynamic(
   () => import('@/components/editor/BlockNoteEditor').then(m => m.BlockNoteEditor),
@@ -93,6 +94,8 @@ export default function SourceDetailPage({
   const [roadmapLoading, setRoadmapLoading] = useState(false);
   const [roadmapOpen, setRoadmapOpen] = useState(false);
   const [isDetailedRoadmap, setIsDetailedRoadmap] = useState(false);
+  const [roadmapError, setRoadmapError] = useState<{ message: string; isCreditsExhausted: boolean } | null>(null);
+  const [showApiKeyModal, setShowApiKeyModal] = useState(false);
 
   // Close mode menu on outside click
   useEffect(() => {
@@ -131,13 +134,12 @@ export default function SourceDetailPage({
     })();
   }, [userId, id, sourceId]);
 
-  // Auto-generate roadmap from transcript
-  useEffect(() => {
+  const generateRoadmap = useCallback((forceDetailed = false) => {
     if (!source) return;
     let meta: any = {};
     try { meta = JSON.parse(source.metadata as unknown as string || '{}'); } catch {}
-    
-    if (meta.roadmap) {
+
+    if (!forceDetailed && meta.roadmap) {
       setRoadmapNodes(meta.roadmap.nodes || []);
       setRoadmapEdges(meta.roadmap.edges || []);
       setRoadmapOpen(true);
@@ -149,45 +151,53 @@ export default function SourceDetailPage({
 
     // Trigger roadmap generation using sourceId instead of full transcript
     setRoadmapLoading(true);
+    setRoadmapError(null);
     fetch('/api/concept-map', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ sourceId }),
+      body: JSON.stringify({ sourceId, ...(forceDetailed ? { detailed: true } : {}) }),
     })
-      .then(r => r.json())
-      .then(data => {
+      .then(async r => {
+        const data = await r.json();
+        if (!r.ok || data.error) {
+          const isCredits = Boolean(
+            r.status === 402 ||
+            data.code === 'AI_CREDITS_EXHAUSTED' ||
+            data.isCreditsExhausted ||
+            data.error?.toLowerCase().includes('credits') ||
+            data.error?.toLowerCase().includes('quota')
+          );
+          setRoadmapError({
+            message: data.error || 'Failed to generate concept map',
+            isCreditsExhausted: isCredits,
+          });
+          return;
+        }
         if (data.nodes?.length) {
           setRoadmapNodes(data.nodes);
           setRoadmapEdges(data.edges || []);
           setRoadmapOpen(true);
+          if (forceDetailed) setIsDetailedRoadmap(true);
+          setRoadmapError(null);
         }
       })
-      .catch(() => {})
+      .catch((err) => {
+        setRoadmapError({
+          message: err instanceof Error ? err.message : 'Network error loading concept map',
+          isCreditsExhausted: false,
+        });
+      })
       .finally(() => setRoadmapLoading(false));
   }, [source, sourceId]);
 
   const generateDetailedRoadmap = useCallback(() => {
-    if (!source) return;
-    let meta: any = {};
-    try { meta = JSON.parse(source.metadata as unknown as string || '{}'); } catch {}
-    // Trigger detailed roadmap using sourceId
-    setRoadmapLoading(true);
-    fetch('/api/concept-map', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ sourceId, detailed: true }),
-    })
-      .then(r => r.json())
-      .then(data => {
-        if (data.nodes?.length) {
-          setRoadmapNodes(data.nodes);
-          setRoadmapEdges(data.edges || []);
-          setIsDetailedRoadmap(true);
-        }
-      })
-      .catch(() => {})
-      .finally(() => setRoadmapLoading(false));
-  }, [source, sourceId]);
+    generateRoadmap(true);
+  }, [generateRoadmap]);
+
+  // Auto-generate roadmap from transcript
+  useEffect(() => {
+    generateRoadmap(false);
+  }, [generateRoadmap]);
 
   const handleSaveNotes = useCallback(async (content: string) => {
     setSaveStatus('saving');
@@ -363,7 +373,7 @@ export default function SourceDetailPage({
 
       {/* ── Body: roadmap mode gets its own 2-column layout ── */}
       {aiMode === 'roadmap_guide' ? (
-        <PanelGroup direction="horizontal" className="flex flex-1 overflow-hidden bg-[#0F1115]">
+        <PanelGroup orientation="horizontal" className="flex flex-1 overflow-hidden bg-[#0F1115]">
           {/* Left: source */}
           {sourceOpen && (
             <>
@@ -389,12 +399,12 @@ export default function SourceDetailPage({
       ) : (
 
       /* ── 3-column body (all other modes) ── */
-      <PanelGroup direction="horizontal" className="flex flex-1 overflow-hidden bg-[#0F1115]">
+      <PanelGroup orientation="horizontal" className="flex flex-1 overflow-hidden bg-[#0F1115]">
 
         {/* Column 1: Source Viewer */}
         {sourceOpen && (
           <>
-            <Panel ref={sourcePanelRef} collapsible defaultSize={38} minSize={20} className="flex flex-col bg-black">
+            <Panel panelRef={sourcePanelRef} collapsible defaultSize={38} minSize={20} className="flex flex-col bg-black">
               <SourceViewer ref={sourceViewerRef} sourceId={source.$id} sourceType={source.sourceType} url={source.url} title={source.title} />
             </Panel>
             <PanelResizeHandle className="w-1 bg-[#252B36] hover:bg-[#7C5CFF] transition-colors cursor-col-resize" />
@@ -438,6 +448,40 @@ export default function SourceDetailPage({
             {/* ── LEARN TAB ── */}
             {activeTab === 'Learn' && (
               <div className="space-y-5 max-w-3xl">
+
+                {/* Roadmap / concept map error banner */}
+                {roadmapError && (
+                  <div className="bg-[#1a1625] rounded-[20px] p-5 border border-[#7C5CFF]/30 space-y-3">
+                    <div className="flex items-start gap-3">
+                      <span className="text-xl shrink-0">⚠️</span>
+                      <div className="flex-1">
+                        <h3 className="text-sm font-bold text-white">
+                          {roadmapError.isCreditsExhausted ? 'AI Ran Out of Credits / Quota Limit' : 'Concept Map Generation Failed'}
+                        </h3>
+                        <p className="text-[13px] text-[#A2A8B5] mt-1 leading-relaxed">
+                          {roadmapError.message}
+                        </p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2 pt-1 pl-8">
+                      {roadmapError.isCreditsExhausted && (
+                        <button
+                          onClick={() => setShowApiKeyModal(true)}
+                          className="px-3.5 py-1.5 rounded-xl text-xs font-semibold bg-[#7C5CFF] text-white hover:bg-[#6c4fe0] transition-colors flex items-center gap-1.5"
+                        >
+                          <span>🔑</span>
+                          <span>Add Your Own API Key</span>
+                        </button>
+                      )}
+                      <button
+                        onClick={() => generateRoadmap(false)}
+                        className="px-3 py-1.5 rounded-xl text-xs font-semibold bg-[#252B36] text-[#A2A8B5] hover:text-white transition-colors"
+                      >
+                        Retry
+                      </button>
+                    </div>
+                  </div>
+                )}
 
                 {/* Roadmap / concept map */}
                 {(roadmapLoading || roadmapNodes.length > 0) && (
@@ -628,7 +672,7 @@ export default function SourceDetailPage({
         {aiOpen && (
           <>
             <PanelResizeHandle className="w-1 bg-[#252B36] hover:bg-[#7C5CFF] transition-colors cursor-col-resize" />
-            <Panel ref={aiPanelRef} collapsible defaultSize={25} minSize={15} className="flex flex-col bg-[#0F1115]">
+            <Panel panelRef={aiPanelRef} collapsible defaultSize={25} minSize={15} className="flex flex-col bg-[#0F1115]">
               <AssistantPanel
                 sourceId={source.$id}
                 mode={aiMode}
@@ -648,6 +692,12 @@ export default function SourceDetailPage({
         )}
       </PanelGroup>
       )} {/* end roadmap ternary */}
+
+      <ApiKeyModal
+        isOpen={showApiKeyModal}
+        onClose={() => setShowApiKeyModal(false)}
+        onSaved={() => generateRoadmap(false)}
+      />
     </div>
   );
 }

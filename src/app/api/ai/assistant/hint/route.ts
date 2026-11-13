@@ -10,7 +10,7 @@ import {
   buildAssistantContext,
   createSystemPrompt,
 } from '@/lib/assistant';
-import { callAI } from '@/lib/ai';
+import { callAI, formatAIErrorResponse } from '@/lib/ai';
 import { verifyContextAccess } from '@/lib/auth/workspace';
 
 /**
@@ -99,10 +99,8 @@ export async function POST(req: NextRequest) {
     });
   } catch (error) {
     console.error('Hint error:', error);
-    return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500 }
-    );
+    const { response, status } = formatAIErrorResponse(error, 'Failed to generate hint');
+    return NextResponse.json(response, { status });
   }
 }
 

@@ -18,7 +18,7 @@ export function TopBar({ onToggleMobileMenu }: TopBarProps) {
       <header
         className="h-14 shrink-0 flex items-center justify-between px-4 sm:px-6 border-b border-gray-100 bg-white"
       >
-        {/* Mobile Hamburger & Logo */}
+        {/* Mobile Hamburger & Search */}
         <div className="flex items-center gap-3">
           <button
             onClick={onToggleMobileMenu}
@@ -46,15 +46,26 @@ export function TopBar({ onToggleMobileMenu }: TopBarProps) {
         </div>
 
         {/* Right Action buttons */}
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2 sm:gap-3">
           {/* Create Workspace Button */}
           <button
             onClick={() => setIsModalOpen(true)}
-            className="px-3.5 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs transition-all shadow-sm flex items-center gap-1.5"
+            className="px-3 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs transition-all shadow-sm flex items-center gap-1.5"
           >
             <span className="text-sm font-extrabold">+</span>
             <span className="hidden sm:inline">New Workspace</span>
           </button>
+
+          {/* AI & API Keys button */}
+          <Link
+            href="/settings/keys"
+            title="AI & API Keys"
+            className="h-8 px-2.5 rounded-xl flex items-center gap-1.5 text-xs font-semibold text-gray-700 transition-colors hover:bg-gray-100 border border-gray-200"
+            style={{ textDecoration: 'none' }}
+          >
+            <span className="text-sm">🔑</span>
+            <span className="hidden md:inline text-[11px] text-[#6c63ff] font-bold">AI Keys</span>
+          </Link>
 
           {/* Wallet button */}
           <WalletButton variant="compact" labelConnect="🦊 Connect" className="hidden lg:inline-flex text-xs" />

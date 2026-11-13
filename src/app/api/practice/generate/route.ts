@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@clerk/nextjs/server';
-import { callAI } from '@/lib/ai';
+import { callAI, formatAIErrorResponse } from '@/lib/ai';
 import { parseAiJson } from '@/lib/json';
 import { getSource } from '@/lib/db/sources';
 import { listNotesBySource } from '@/lib/db/notes';
@@ -151,6 +151,7 @@ Return ONLY valid JSON:
     return NextResponse.json({ sourceId: body.sourceId, scopeLabel, chunkLabels: labels, practice: data });
   } catch (e) {
     console.error('[practice/generate] error', e);
-    return NextResponse.json({ error: e instanceof Error ? e.message : 'Failed to generate practice' }, { status: 500 });
+    const { response, status } = formatAIErrorResponse(e, 'Failed to generate practice');
+    return NextResponse.json(response, { status });
   }
 }

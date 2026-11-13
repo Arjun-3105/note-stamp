@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { callAI } from '@/lib/ai';
+import { callAI, formatAIErrorResponse } from '@/lib/ai';
 import { parseAiJson } from '@/lib/json';
 import { getLocalRoadmap, saveLocalRoadmap } from '@/lib/local-db';
 
@@ -109,9 +109,7 @@ Expected format:
     return NextResponse.json(data);
   } catch (error) {
     console.error('Prerequisite map error:', error);
-    return NextResponse.json(
-      { error: error instanceof Error ? error.message : 'Failed to generate prerequisite map' },
-      { status: 500 }
-    );
+    const { response, status } = formatAIErrorResponse(error, 'Failed to generate prerequisite map');
+    return NextResponse.json(response, { status });
   }
 }

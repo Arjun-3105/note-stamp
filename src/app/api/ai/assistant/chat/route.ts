@@ -10,7 +10,7 @@ import {
   buildAssistantContext,
   createSystemPrompt,
 } from '@/lib/assistant';
-import { callAIStreaming, type Tool } from '@/lib/ai';
+import { callAIStreaming, isCreditsExhaustedError, type Tool } from '@/lib/ai';
 import { checkAssistantRateLimit } from '@/lib/ratelimit';
 import { addMessage } from '@/lib/db/chat-sessions';
 import { verifyContextAccess } from '@/lib/auth/workspace';
@@ -137,7 +137,20 @@ TOOLS: You have access to tools. Use them when:
           controller.close();
         } catch (error) {
           console.error('[chat] Stream error:', error);
-          controller.error(error);
+          if (isCreditsExhaustedError(error)) {
+            controller.enqueue(
+              encoder.encode(
+                '\n\n⚠️ **AI Ran Out of Credits**: The AI service has exhausted its quota or credits. Please add your own OpenRouter or Gemini API key in **Settings → AI & Keys** to continue.'
+              )
+            );
+          } else {
+            controller.enqueue(
+              encoder.encode(
+                '\n\n⚠️ An error occurred while generating AI response. Please try again.'
+              )
+            );
+          }
+          controller.close();
         }
       },
     });

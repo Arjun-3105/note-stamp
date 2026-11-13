@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useRef, useEffect, useCallback } from 'react';
+import Link from 'next/link';
 import { MessageBubble } from './MessageBubble';
 import { AssistantInput } from './AssistantInput';
 import type { CorrectionData } from './CorrectionDiff';
@@ -226,12 +227,7 @@ function TeacherPanel({
             ))}
           </div>
         )}
-        {error && (
-          <div className="mx-1 rounded-xl px-3 py-2 text-[12px] text-red-400"
-            style={{ background: '#2a1a1a', border: '1px solid rgba(248,113,113,0.3)' }}>
-            {error}
-          </div>
-        )}
+        {error && <AssistantErrorMessage error={error} />}
         <div ref={messagesEndRef} />
       </div>
 
@@ -590,12 +586,7 @@ function CorrectorPanel({
           </div>
         )}
 
-        {error && (
-          <div className="rounded-xl px-3 py-2 text-[12px] text-red-400"
-            style={{ background: '#2a1a1a', border: '1px solid rgba(248,113,113,0.3)' }}>
-            {error}
-          </div>
-        )}
+        {error && <AssistantErrorMessage error={error} />}
         <div ref={messagesEndRef} />
       </div>
     </div>
@@ -732,12 +723,7 @@ function RoadmapGuidePanel({
             ))}
           </div>
         )}
-        {error && (
-          <div className="rounded-xl px-3 py-2 text-[12px] text-red-400"
-            style={{ background: '#2a1a1a', border: '1px solid rgba(248,113,113,0.3)' }}>
-            {error}
-          </div>
-        )}
+        {error && <AssistantErrorMessage error={error} />}
         <div ref={messagesEndRef} />
       </div>
 
@@ -933,12 +919,7 @@ function ProblemSolverPanel({
           </div>
         )}
 
-        {error && (
-          <div className="rounded-xl px-3 py-2 text-[12px] text-red-400"
-            style={{ background: '#2a1a1a', border: '1px solid rgba(248,113,113,0.3)' }}>
-            {error}
-          </div>
-        )}
+        {error && <AssistantErrorMessage error={error} />}
         <div ref={messagesEndRef} />
       </div>
 
@@ -981,12 +962,7 @@ function QuizHintPanel({ contextId, onCitationClick }: { contextId?: string; onC
             ))}
           </div>
         )}
-        {error && (
-          <div className="rounded-xl px-3 py-2 text-[12px] text-red-400"
-            style={{ background: '#2a1a1a', border: '1px solid rgba(248,113,113,0.3)' }}>
-            {error}
-          </div>
-        )}
+        {error && <AssistantErrorMessage error={error} />}
         <div ref={messagesEndRef} />
       </div>
       <div className="px-3 pb-3 shrink-0">
@@ -1106,6 +1082,38 @@ export function AssistantPanel({
           <QuizHintPanel contextId={contextId} onCitationClick={onCitationClick} />
         )}
       </div>
+    </div>
+  );
+}
+
+function AssistantErrorMessage({ error }: { error: string }) {
+  const isCredits =
+    error.toLowerCase().includes('credits') ||
+    error.toLowerCase().includes('quota') ||
+    error.toLowerCase().includes('ai_credits_exhausted') ||
+    error.toLowerCase().includes('balance');
+
+  return (
+    <div
+      className="mx-1 rounded-xl px-3 py-2 text-[12px] text-red-300 space-y-1.5"
+      style={{ background: '#2a1a1a', border: '1px solid rgba(248,113,113,0.3)' }}
+    >
+      <div className="flex items-start gap-1.5">
+        <span className="shrink-0">{isCredits ? '⚠️' : '✕'}</span>
+        <span className="flex-1 leading-relaxed">{error}</span>
+      </div>
+      {isCredits && (
+        <div className="pt-1">
+          <Link
+            href="/settings/keys"
+            className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-semibold bg-[#7C5CFF] text-white hover:bg-[#6c4fe0] transition-colors"
+            style={{ textDecoration: 'none' }}
+          >
+            <span>🔑</span>
+            <span>Configure API Keys</span>
+          </Link>
+        </div>
+      )}
     </div>
   );
 }

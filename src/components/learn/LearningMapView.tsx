@@ -1065,7 +1065,7 @@ export function LearningMapView({
                       : 'Click "Generate" to create a prerequisite roadmap showing what you need to know before this source.'}
                   </p>
                   {mapType === 'prerequisites' && (
-                    <button onClick={fetchPrereqs}
+                    <button onClick={() => fetchPrereqs()}
                       className="px-5 py-2 rounded-xl text-[13px] font-bold transition-all hover:opacity-90"
                       style={{ background: '#22c55e', color: '#000' }}>
                       Generate Prerequisites Map

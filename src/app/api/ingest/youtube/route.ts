@@ -5,7 +5,7 @@ import { calculateInputHash, normalizeText, extractMetadata, isEducationalConten
 import { z } from 'zod';
 import { YoutubeTranscript } from 'youtube-transcript';
 import { saveLocalTranscript } from '@/lib/local-db';
-import { callAI } from '@/lib/ai';
+import { callAI, isCreditsExhaustedError } from '@/lib/ai';
 import { chunkTextByWords, saveSourceChunks } from '@/lib/source-chunks';
 
 export const maxDuration = 60;
@@ -20,7 +20,6 @@ interface YouTubeMetadata {
   channelName?: string;
   thumbnail?: string;
   publishedAt?: string;
-  viewCount?: number;
 }
 
 /**
@@ -29,7 +28,7 @@ interface YouTubeMetadata {
 function extractVideoId(url: string): string | null {
   const patterns = [
     /(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/)([a-zA-Z0-9_-]{11})/,
-    /^([a-zA-Z0-9_-]{11})$/,
+    /youtube\.com\/shorts\/([a-zA-Z0-9_-]{11})/,
   ];
 
   for (const pattern of patterns) {
@@ -149,7 +148,7 @@ async function fetchYouTubeMetadata(videoId: string): Promise<{ title: string; m
     );
 
     if (!response.ok) {
-      throw new Error('Failed to fetch metadata');
+      throw new Error(`YouTube oEmbed API returned ${response.status}`);
     }
 
     const data = await response.json();
@@ -162,7 +161,7 @@ async function fetchYouTubeMetadata(videoId: string): Promise<{ title: string; m
       },
     };
   } catch (error) {
-    console.error('Failed to fetch YouTube metadata:', error);
+    console.error('Failed to fetch video metadata:', error);
     return {
       title: 'YouTube Video',
       metadata: {},
@@ -172,15 +171,9 @@ async function fetchYouTubeMetadata(videoId: string): Promise<{ title: string; m
 
 export async function POST(req: NextRequest) {
   try {
-    const { userId } = await auth();
-    if (!userId) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
-
     const body = await req.json();
     const { videoUrl, workspaceId } = RequestSchema.parse(body);
 
-    // Extract video ID
     const videoId = extractVideoId(videoUrl);
     if (!videoId) {
       return NextResponse.json(
@@ -189,26 +182,32 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    const { userId } = await auth();
+    if (!userId) {
+      return NextResponse.json(
+        { error: 'Unauthorized' },
+        { status: 401 }
+      );
+    }
+
     // Fetch transcript with fallbacks
     let transcript = await fetchYouTubeTranscript(videoId);
     const normalizedTranscript = normalizeText(transcript);
 
-    // Check if educational content
-    if (!isEducationalContent(normalizedTranscript)) {
-      return NextResponse.json(
-        {
-          error: 'Content does not appear to be educational',
-          hint: 'Please ensure the video has educational content (lectures, tutorials, etc.)',
-        },
-        { status: 400 }
-      );
-    }
-
-    // Calculate hash for caching
+    // Calculate hash for deduplication
     const inputHash = calculateInputHash(normalizedTranscript);
 
     // Fetch metadata
     const { title, metadata } = await fetchYouTubeMetadata(videoId);
+
+    // Validate educational content - lenient check for learning
+    const isEducational = isEducationalContent(normalizedTranscript);
+    if (!isEducational && normalizedTranscript.length < 50) {
+      return NextResponse.json(
+        { error: 'The provided content does not appear to contain educational material.' },
+        { status: 422 }
+      );
+    }
 
     // Generate AI Summary for Appwrite Metadata
     const summaryPrompt = `
@@ -237,8 +236,13 @@ ${normalizedTranscript.slice(0, 300000)}
       });
       aiSummary = JSON.parse(result.content);
     } catch (err) {
-      console.warn("Failed to generate AI summary, using default:", err);
-      aiSummary = { summary: 'Summary unavailable' };
+      if (isCreditsExhaustedError(err)) {
+        console.warn("[YouTube Ingest] AI summary skipped: Shared AI ran out of credits/quota.");
+        aiSummary = { summary: 'AI summary skipped (shared AI quota exhausted). You can add your own API key in Settings.' };
+      } else {
+        console.warn("Failed to generate AI summary, using default:", err);
+        aiSummary = { summary: 'Summary unavailable' };
+      }
     }
 
     // Create source document
@@ -260,12 +264,12 @@ ${normalizedTranscript.slice(0, 300000)}
     await saveLocalTranscript(source.$id, normalizedTranscript);
     await saveSourceChunks(source.$id, chunkTextByWords(source.$id, normalizedTranscript));
 
-    // Store transcript status
-    await updateSourceStatus(source.$id, 'ready', `data/transcripts/${source.$id}.txt`);
+    // Update status to ready
+    await updateSourceStatus(source.$id, 'ready');
 
     return NextResponse.json({
       sourceId: source.$id,
-      title,
+      title: source.title,
       transcript: normalizedTranscript,
       metadata: source.metadata,
       message: 'YouTube content imported successfully',

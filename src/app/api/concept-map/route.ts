@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { callAI } from "@/lib/ai";
+import { callAI, formatAIErrorResponse } from "@/lib/ai";
 import { parseAiJson } from "@/lib/json";
 import { getLocalTranscript, getLocalRoadmap, saveLocalRoadmap } from "@/lib/local-db";
 import { getSource } from "@/lib/db/sources";
@@ -175,10 +175,8 @@ ${excerpt}
     return NextResponse.json(data);
   } catch (error) {
     console.error('Concept map error:', error);
-    return NextResponse.json(
-      { error: error instanceof Error ? error.message : "Failed to generate concept map" },
-      { status: 500 }
-    );
+    const { response, status } = formatAIErrorResponse(error, "Failed to generate concept map");
+    return NextResponse.json(response, { status });
   }
 }
 

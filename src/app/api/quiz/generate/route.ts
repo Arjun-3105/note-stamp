@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@clerk/nextjs/server';
-import { callAI } from '@/lib/ai';
+import { callAI, formatAIErrorResponse } from '@/lib/ai';
 import { parseAiJson } from '@/lib/json';
 import { getSource } from '@/lib/db/sources';
 import { listNotesBySource } from '@/lib/db/notes';
@@ -201,6 +201,7 @@ Rules: theoryQuiz length MUST be ${numQuestions}. Valid JSON only.
     });
   } catch (e) {
     console.error('[quiz/generate] error', e);
-    return NextResponse.json({ error: e instanceof Error ? e.message : 'Failed to generate quiz' }, { status: 500 });
+    const { response, status } = formatAIErrorResponse(e, 'Failed to generate quiz');
+    return NextResponse.json(response, { status });
   }
 }
